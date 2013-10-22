@@ -1,0 +1,80 @@
+# yaml for cv2video:
+# required:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       don't use () or [], etc.
+
+# break: True if you don't want to continue process 
+#       **sibling** items AND **child** items
+#       following the **successful** processing of the current entry
+#       @@ the logic needs to be revised; this should be mostly used for skipping **sibling** items
+
+# match: always followed by a image filename
+#       currently we do a template match. 
+#       @@ we should consider a feature-based method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: CBAL_Math_2013
+    startFrame: 1
+    scalingRatio: 0.5
+    frameChangeThreshold: 3
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0.5 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: 0  
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "."
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+    
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: False
+    # gazeProcessingScript: "eyelog2dat_Tobii.awk"
+    # logFileSuffix: "-All-Data.tsv"
+    
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+    
+    # Show AOIs on the video?
+    displayAOI: True
+
+items: &assessmentItems
+    Item:
+        match: CBALM_sig.png
+        log: Item 
+        aoi: 0, 0, 1920, 1280
+        #ocr: 0, 0, 1280, 1024
+        break: false 
+    Mouse:
+        track: mouse1.png, 0.2
+        #threshold: 0.2
+        log: mouseFound
+    Simulation:
+        track: simusig.png, 0.01
+        #threshold: 0.01
+        log: SimulationToolActivated
+
+tasks:
+    Assessment:
+        match: CBALM_sig.png
+        log: taskName='assessment'
+        ocr: 617, 281 ,49, 16
+        items: *assessmentItems
+
+        

@@ -1,0 +1,527 @@
+# yaml for video2aoi.py
+# Gary Feng, 2013, Princeton, NJ
+
+# requires:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# aoi: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# break: specify this if you don't want to continue processing 
+#       the rest of **sibling** items 
+#       following the **successful** processing of the current entry
+#       doesn't matter if you specify True or False, so long as it appears
+
+# match: always followed by a image filename, followed by options:
+#       match: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#       sourceLoc: x, y, w, h, or x1, y1, x2, y2, depending on "aoiFormat" 
+#           this specifies the subimage that will be used as the signature. 
+#           and by default, match will first tries to do a image match at this location in the dest image
+#           if this fails, it will do an exhaustive template matching
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# track: always followed by a image filename, followed by options:
+#       track: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#           we don't specify a location because it's unknown. @@ we could internally try to find in the vicinity
+#           of the last found, but that may not be necessary.
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: CBAL_Math_2013
+    startFrame: 1
+    scalingRatio: 0.5
+    frameChangeThreshold: 4
+    matchTemplateThreshold: 0.02
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0.5 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: 0  
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "."
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+    
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: False
+    # gazeProcessingScript: "eyelog2dat_Tobii.awk"
+    # logFileSuffix: "-All-Data.tsv"
+    
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+    
+    # Show AOIs on the video?
+    displayAOI: True
+
+
+items: &assessmentItems
+    #Mouse:
+        #track: mouse1.png, 0.2
+        #threshold: 0.2
+        #log: mouseFound
+
+    MSTITLE:
+        match: MSTITLE.png
+        log: MSTITLE
+        MSTITLEBANNER:
+            log: MSTITLEBANNER
+            aoi: 448, 244, 1022, 27
+        MSTITLENAVIGATION:
+            log: MSTITLENAVIGATION
+            aoi: 1218, 244, 254, 68
+        MSTITLEPRE-ALGEBRA:
+            log: MSTITLEPRE-ALGEBRA
+            aoi: 891, 372, 136, 27
+        MSTITLEPARTII:
+            log: MSTITLEPARTII
+            aoi: 777, 437, 411, 64
+        MSTITLECALCINSTRUCTION:
+            log: MSTITLECALCINSTRUCTION
+            aoi: 615, 561, 691, 54
+        break: true
+
+    MSINTRO:
+        match: MSINTRO.png
+        log: MSINTRO
+        MSINTROTITLE:
+            log: MSINTROTITLE
+            aoi: 859, 340, 202, 27
+        MSINTROIMAGE:
+            log: MSINTROIMAGE
+            aoi: 710, 384, 501, 283
+        MSINTROINTROTEXT:
+            log: MSINTROINTROTEXT
+            aoi: 859, 340, 202, 27
+        break: true
+
+    MSPRACTICE:
+        match: MSPRACTICE.png
+        log: MSPRACTICE
+        MSPRACTICETOOLBUTTON:
+            log: MSPRACTICETOOLBUTTON
+            aoi: 1160, 246, 84, 68
+        MSPRACTICECALCULATORBUTTON:
+            log: MSPRACTICECALCULATORBUTTON
+            aoi: 1244, 236, 63, 68
+        MSPRACTICETITLE:
+            log: MSPRACTICETITLE
+            aoi: 558, 339, 102, 25
+        MSPRACTICEINSTRUCTONS:
+            log: MSPRACTICEINSTRUCTONS
+            aoi: 553, 362, 832, 149
+        MSPRACTICEQUESTION1:
+            log: MSPRACTICEQUESTION1
+            aoi: 559, 521, 825, 123
+        MSPRACTICEQUESTION2:
+            log: MSPRACTICEQUESTION2
+            aoi: 559, 644, 825, 113
+        MSPRACTICECORRECTANS:
+            log: MSPRACTICECORRECTANS
+            aoi: 1291, 780, 119, 55
+        break: true
+
+    MSQ1:
+        match: MSQ1.png
+        log: MSQ1
+        MSQ1LSIDE:
+            log: MSQ1LSIDE
+            aoi: 449, 312, 599, 571
+        MSQ1TOTALIMAGE:
+            log: MSQ1TOTALIMAGE
+            aoi: 468, 386, 570, 361
+        MSQ1MOVINGSDWLK:
+            log: MSQ1MOVINGSDWLK
+            aoi: 491, 412, 413, 233
+        MSQ1STARTSTOPRESET:
+            log: MSQ1STARTSTOPRESET
+            aoi: 920, 457, 88, 130
+        MSQ1RSIDE:
+            log: MSQ1RSIDE
+            aoi: 1047, 311, 421, 572
+        MSQ1INSTRUCTONS:
+            log: MSQ1INSTRUCTONS
+            aoi: 1048, 331, 404, 64
+        MSQ1RESPONSES:
+            log: MSQ1RESPONSES
+            aoi: 1048, 395, 404, 146
+        break: true
+
+    MSQ2:
+        match: MSQ2.png
+        log: MSQ2
+        MSQ2LSIDE:
+            log: MSQ2LSIDE
+            aoi: 449, 311, 500, 571
+        MSQ2MSIMAGE:
+            log: MSQ2MSIMAGE
+            aoi: 492, 338, 419, 237
+        MSQ2TABLE:
+            log: MSQ2TABLE
+            aoi: 551, 610, 301, 163
+        MSQ2RSIDE:
+            log: MSQ2RSIDE
+            aoi: 944, 311, 526, 573
+        MSQ2QUESTIONA:
+            log: MSQ2QUESTIONA
+            aoi: 944, 352, 526, 51
+        MSQ2QSARESPONSE:
+            log: MSQ2QSARESPONSE
+            aoi: 944, 403, 526, 82
+        MSQ2QUESTIONB:
+            log: MSQ2QUESTIONB
+            aoi: 944, 502, 526, 32
+        MSQ2QSBRESPONSE:
+            log: MSQ2QSBRESPONSE
+            aoi: 944, 534, 526, 36
+        break: true
+
+    MSQ3:
+        match: MSQ3.png
+        log: MSQ3
+        MSQ3LSIDE:
+            log: MSQ3LSIDE
+            aoi: 449, 310, 374, 573
+        MSQ3MSIMAGE:
+            log: MSQ3MSIMAGE
+            aoi: 499, 338, 275, 153
+        MSQ3TABLE:
+            log: MSQ3TABLE
+            aoi: 511, 526, 253, 162
+        MSQ3RSIDE:
+            log: MSQ3RSIDE
+            aoi: 822, 317, 650, 568
+        MSQ3DIRECTIONS:
+            log: MSQ3DIRECTIONS
+            aoi: 822, 317, 650, 62
+        MSQ3TABLE:
+            log: MSQ3TABLE
+            aoi: 874, 385, 522, 457
+        MSQ3LINEBOX:
+            log: MSQ3LINEBOX
+            aoi: 1271, 445, 102, 36
+        MSQ3UNDOBOX:
+            log: MSQ3UNDOBOX
+            aoi: 1271, 755, 101, 35
+        MSQ3STARTOVERBOX:
+            log: MSQ3STARTOVERBOX
+            aoi: 1271, 801, 101, 32
+        break: true
+
+    MSQ4:
+        match: MSQ4.png
+        log: MSQ4
+        MSQ4LSIDE:
+            log: MSQ4LSIDE
+            aoi: 449, 311, 448, 566
+        MSQ4RSIDE:
+            log: MSQ4RSIDE
+            aoi: 897, 311, 574, 566
+        MSQ4MSIMAGE:
+            log: MSQ4MSIMAGE
+            aoi: 552, 330, 260, 148
+        MSQ4GRAPH:
+            log: MSQ4GRAPH
+            aoi: 511, 478, 331, 385
+        MSQ4QUESTIONA:
+            log: MSQ4QUESTIONA
+            aoi: 895, 328, 559, 54
+        MSQ4QSARESPONSE:
+            log: MSQ4QSARESPONSE
+            aoi: 895, 382, 559, 51
+        MSQ4QUESTIONB:
+            log: MSQ4QUESTIONB
+            aoi: 895, 433, 559, 47
+        MSQ4QSBRESPONSE:
+            log: MSQ4QSBRESPONSE
+            aoi: 895, 480, 559, 52
+        MSQ4QUESTIONC:
+            log: MSQ4QUESTIONC
+            aoi: 895, 532, 559, 46
+        MSQ4QSCRESPONSE:
+            log: MSQ4QSCRESPONSE
+            aoi: 895, 578, 559, 118
+        MSQ4SLOPE:
+            log: MSQ4SLOPE
+            aoi: 895, 695, 559, 27
+        MSQ4UNITS:
+            log: MSQ4UNITS
+            aoi: 895, 723, 559, 33
+        MSQ4QUESTIOND:
+            log: MSQ4QUESTIOND
+            aoi: 895, 756, 559, 50
+        MSQ4QSDRESPONSE:
+            log: MSQ4QSDRESPONSE
+            aoi: 895, 806, 559, 62
+        break: true
+
+    MSQ5:
+        match: MSQ5.png
+        log: MSQ5
+        MSQ5LSIDE:
+            log: MSQ5LSIDE
+            aoi: 448, 312, 488, 570
+        MSQ5RSIDE:
+            log: MSQ5RSIDE
+            aoi: 935, 312, 536, 570
+        MSQ5GRAPH:
+            log: MSQ5GRAPH
+            aoi: 467, 334, 456, 523
+        MSQ5TABLE:
+            log: MSQ5TABLE
+            aoi: 946, 340, 242, 142
+        MSQ5MSIMAGE:
+            log: MSQ5MSIMAGE
+            aoi: 1213, 340, 226, 128
+        MSQ5STIMULUS:
+            log: MSQ5STIMULUS
+            aoi: 935, 496, 523, 106
+        MSQ5QUESTION:
+            log: MSQ5QUESTION
+            aoi: 935, 602, 523, 53
+        MSQ5RESPONSE:
+            log: MSQ5RESPONSE
+            aoi: 935, 661, 523, 80
+        break: true
+
+    MSQ6:
+        match: MSQ6.png
+        log: MSQ6
+        MSQ6LSIDE:
+            log: MSQ6LSIDE
+            aoi: 448, 312, 488, 570
+        MSQ6RSIDE:
+            log: MSQ6RSIDE
+            aoi: 943, 312, 526, 570
+        MSQ6GRAPH:
+            log: MSQ6GRAPH
+            aoi: 467, 334, 456, 523
+        MSQ6MSIMAGE:
+            log: MSQ6MSIMAGE
+            aoi: 1081, 331, 226, 128
+        MSQ6QUESTION A:
+            log: MSQ6QUESTION A
+            aoi: 943, 469, 503, 71
+        MSQ6RESPONSEA:
+            log: MSQ6RESPONSEA
+            aoi: 943, 540, 179, 43
+        MSQ6QUESTIONB:
+            log: MSQ6QUESTIONB
+            aoi: 943, 583, 503, 36
+        MSQ6RESPONSEB:
+            log: MSQ6RESPONSEB
+            aoi: 943, 619, 503, 89
+        break: true
+
+    MSQ7:
+        match: MSQ7.png
+        log: MSQ7
+        MSQ7LSIDE:
+            log: MSQ7LSIDE
+            aoi: 448, 312, 483, 570
+        MSQ7RSIDE:
+            log: MSQ7RSIDE
+            aoi: 933, 312, 536, 570
+        MSQ7STIMULUS:
+            log: MSQ7STIMULUS
+            aoi: 467, 330, 438, 270
+        MSQ7MSIMAGE:
+            log: MSQ7MSIMAGE
+            aoi: 1071, 331, 226, 128
+        MSQ7QUESTION:
+            log: MSQ7QUESTION
+            aoi: 933, 472, 504, 97
+        MSQ7RESPONSE:
+            log: MSQ7RESPONSE
+            aoi: 933, 569, 504, 152
+        break: true
+
+    MSQ8:
+        match: MSQ8.png
+        log: MSQ8
+        MSQ8TOP:
+            log: MSQ8TOP
+            aoi: 448, 312, 1022, 170
+        MSQ8DIRECTIONS A:
+            log: MSQ8DIRECTIONS A
+            aoi: 448, 317, 1022, 41
+        MSQ8UNPLAYED ANIMATION:
+            log: MSQ8UNPLAYED ANIMATION
+            aoi: 482, 358, 955, 111
+        MSQ8ANIMATION:
+            log: MSQ8ANIMATION
+            aoi: 946, 358, 491, 111
+        MSQ8LOWERLSIDE:
+            log: MSQ8LOWERLSIDE
+            aoi: 448, 482, 490, 339
+        MSQ8GRAPH:
+            log: MSQ8GRAPH
+            aoi: 470, 495, 433, 339
+        MSQ8LOWERRSIDE:
+            log: MSQ8LOWERRSIDE
+            aoi: 938, 479, 534, 403
+        MSQ8DIRECTIONSB:
+            log: MSQ8DIRECTIONSB
+            aoi: 938, 479, 534, 45
+        MSQ8QUESTIONA:
+            log: MSQ8QUESTIONA
+            aoi: 938, 542, 493, 32
+        MSQ8RESPONSEA:
+            log: MSQ8RESPONSEA
+            aoi: 938, 572, 200, 34
+        MSQ8QUESTIONB:
+            log: MSQ8QUESTIONB
+            aoi: 938, 609, 493, 32
+        MSQ8RESPONSEB:
+            log: MSQ8RESPONSEB
+            aoi: 938, 635, 200, 34
+        MSQ8QUESTIONC:
+            log: MSQ8QUESTIONC
+            aoi: 938, 673, 493, 32
+        MSQ8RESPONSEC:
+            log: MSQ8RESPONSEC
+            aoi: 938, 702, 200, 34
+        break: true
+
+    MSQ9:
+        match: MSQ9.png
+        log: MSQ9
+        MSQ9TOP:
+            log: MSQ9TOP
+            aoi: 448, 312, 1022, 160
+        MSQ9DIRECTIONSA:
+            log: MSQ9DIRECTIONSA
+            aoi: 448, 312, 1022, 41
+        MSQ9ANIMATION:
+            log: MSQ9ANIMATION
+            aoi: 482, 353, 958, 113
+        MSQ9LOWERLSIDE:
+            log: MSQ9LOWERLSIDE
+            aoi: 448, 476, 497, 406
+        MSQ9IMAGE:
+            log: MSQ9IMAGE
+            aoi: 473, 476, 454, 96
+        MSQ9TABLE:
+            log: MSQ9TABLE
+            aoi: 476, 578, 451, 96
+        MSQ9LOWERRSIDE:
+            log: MSQ9LOWERRSIDE
+            aoi: 945, 476, 526, 408
+        MSQ9STIMULUS:
+            log: MSQ9STIMULUS
+            aoi: 945, 476, 510, 139
+        MSQ9QUESTIONA:
+            log: MSQ9QUESTIONA
+            aoi: 945, 615, 510, 53
+        MSQ9RESPONSEA:
+            log: MSQ9RESPONSEA
+            aoi: 945, 666, 218, 36
+        MSQ9QUESTIONB:
+            log: MSQ9QUESTIONB
+            aoi: 945, 702, 510, 53
+        MSQ9RESPONSEB:
+            log: MSQ9RESPONSEB
+            aoi: 945, 749, 218, 36
+        break: true
+
+    MSQ10:
+        match: MSQ10.png
+        log: MSQ10
+        MSQ10DIRECTIONS:
+            log: MSQ10DIRECTIONS
+            aoi: 448, 312, 1022, 69
+        MSQ10LSIDE:
+            log: MSQ10LSIDE
+            aoi: 448, 381, 529, 501
+        MSQ10TOTALGRAPH:
+            log: MSQ10TOTALGRAPH
+            aoi: 465, 381, 507, 485
+        MSQ10ANNWALKINGGRAPH:
+            log: MSQ10ANNWALKINGGRAPH
+            aoi: 705, 382, 263, 249
+        MSQ10ANN RIDING GRAPH:
+            log: MSQ10ANN RIDING GRAPH
+            aoi: 465, 532, 243, 329
+        MSQ10COMBINEBUTTON:
+            log: MSQ10COMBINEBUTTON
+            aoi: 812, 778, 159, 77
+        MSQ10GRAPHNEARC:
+            log: MSQ10GRAPHNEARC
+            aoi: 517, 745, 109, 98
+        MSQ10GRAPHCTOD:
+            log: MSQ10GRAPHCTOD
+            aoi: 517, 555, 209, 282
+        MSQ10GRAPHNEARD:
+            log: MSQ10GRAPHNEARD
+            aoi: 610, 514, 116, 120
+        MSQ10GRAPHDTOE:
+            log: MSQ10GRAPHDTOE
+            aoi: 641, 403, 254, 231
+        MSQ10GRAPHNEARE:
+            log: MSQ10GRAPHNEARE
+            aoi: 772, 403, 123, 88
+        MSQ10RSIDE:
+            log: MSQ10RSIDE
+            aoi: 978, 375, 494, 507
+        MSQ10IMAGE:
+            log: MSQ10IMAGE
+            aoi: 988, 381, 451, 52
+        MSQ10STEM:
+            log: MSQ10STEM
+            aoi: 978, 442, 475, 53
+        MSQ10Q&RA:
+            log: MSQ10Q&RA
+            aoi: 978, 442, 475, 291
+        MSQ10Q&RAA:
+            log: MSQ10Q&RAA
+            aoi: 978, 495, 385, 48
+        MSQ10Q&RAB:
+            log: MSQ10Q&RAB
+            aoi: 978, 543, 385, 46
+        MSQ10Q&RAC:
+            log: MSQ10Q&RAC
+            aoi: 978, 589, 385, 48
+        MSQ10Q&RAD:
+            log: MSQ10Q&RAD
+            aoi: 978, 637, 385, 46
+        MSQ10Q&RAE:
+            log: MSQ10Q&RAE
+            aoi: 978, 684, 385, 48
+        MSQ10Q&RB:
+            log: MSQ10Q&RB
+            aoi: 978, 733, 475, 118
+
+tasks:
+    Simulation:
+        track: simusig.png, 0.02
+        #threshold: 0.01
+        log: SimulationToolActivated
+        break: true
+    Assessment:
+        match: CBALM_sig.png, 0.01
+        log: taskName='assessment'
+        ocr: 617, 281 ,49, 16
+        items: *assessmentItems
+
