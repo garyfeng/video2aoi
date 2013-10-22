@@ -8,3 +8,10 @@ configeration file.
 
 USAGE: video2aoi.py config.yaml video.avi
 
+
+Dependencies:
+
+-- OpenCV 2.4 for Python 2.7
+-- Numpy
+-- Tesseract for Python 2.7
+-- YAML for python
