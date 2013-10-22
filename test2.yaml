@@ -85,6 +85,7 @@ items: &assessmentItems
 
     MSTITLE:
         match: MSTITLE.png
+        sourceLoc: 856, 281, 206, 224
         log: MSTITLE
         MSTITLEBANNER:
             log: MSTITLEBANNER
@@ -105,6 +106,7 @@ items: &assessmentItems
 
     MSINTRO:
         match: MSINTRO.png
+        sourceLoc: 836, 294, 256, 140
         log: MSINTRO
         MSINTROTITLE:
             log: MSINTROTITLE
@@ -119,6 +121,7 @@ items: &assessmentItems
 
     MSPRACTICE:
         match: MSPRACTICE.png
+        sourceLoc: 537, 271, 144, 170
         log: MSPRACTICE
         MSPRACTICETOOLBUTTON:
             log: MSPRACTICETOOLBUTTON
@@ -145,6 +148,7 @@ items: &assessmentItems
 
     MSQ1:
         match: MSQ1.png
+        sourceLoc: 1077, 347, 197, 153
         log: MSQ1
         MSQ1LSIDE:
             log: MSQ1LSIDE
@@ -171,6 +175,7 @@ items: &assessmentItems
 
     MSQ2:
         match: MSQ2.png
+        sourceLoc: 545, 544, 155, 200
         log: MSQ2
         MSQ2LSIDE:
             log: MSQ2LSIDE
@@ -200,6 +205,7 @@ items: &assessmentItems
 
     MSQ3:
         match: MSQ3.png
+        sourceLoc: 977, 335, 166, 105
         log: MSQ3
         MSQ3LSIDE:
             log: MSQ3LSIDE
@@ -232,6 +238,7 @@ items: &assessmentItems
 
     MSQ4:
         match: MSQ4.png
+        sourceLoc: 921, 538, 99, 205
         log: MSQ4
         MSQ4LSIDE:
             log: MSQ4LSIDE
@@ -279,6 +286,7 @@ items: &assessmentItems
 
     MSQ5:
         match: MSQ5.png
+        sourceLoc: 1125, 324, 158, 133
         log: MSQ5
         MSQ5LSIDE:
             log: MSQ5LSIDE
@@ -308,6 +316,7 @@ items: &assessmentItems
 
     MSQ6:
         match: MSQ6.png
+        sourceLoc: 1075, 397, 170, 160
         log: MSQ6
         MSQ6LSIDE:
             log: MSQ6LSIDE
@@ -337,6 +346,7 @@ items: &assessmentItems
 
     MSQ7:
         match: MSQ7.png
+        sourceLoc: 571, 352, 158, 125
         log: MSQ7
         MSQ7LSIDE:
             log: MSQ7LSIDE
@@ -360,6 +370,7 @@ items: &assessmentItems
 
     MSQ8:
         match: MSQ8.png
+        sourceLoc: 932, 454, 206, 149
         log: MSQ8
         MSQ8TOP:
             log: MSQ8TOP
@@ -407,6 +418,7 @@ items: &assessmentItems
 
     MSQ9:
         match: MSQ9.png
+        sourceLoc: 675, 470, 206, 170
         log: MSQ9
         MSQ9TOP:
             log: MSQ9TOP
@@ -448,6 +460,7 @@ items: &assessmentItems
 
     MSQ10:
         match: MSQ10.png
+        sourceLoc: 973, 340, 160, 172
         log: MSQ10
         MSQ10DIRECTIONS:
             log: MSQ10DIRECTIONS
