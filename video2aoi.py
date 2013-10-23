@@ -292,6 +292,8 @@ def p2Task(k, value, context):
             logging.debug(txt+"\tTRACK: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+" relativeAOI="+str(coord)+"\tminVal="+str(minVal))
             pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
             logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+            # exporting the "nice version" of AOI
+            logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
 
             updateAOI((str(fname), str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
@@ -299,7 +301,7 @@ def p2Task(k, value, context):
     # if successful match or NO match needed
     if "log" in value: 
         # simply log the message
-        logging.info("LOG\t"+txt+"\tcontext="+str(context)+"\tmsg="+value["log"])
+        logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["log"]+"'")
     if "aoi" in value:
         # an AOI defined directly by coordinates; will output and add the aoi for matching
         coord = map(int, value["aoi"].split(","))   # by default, in order x1, y1, x2, y2
@@ -310,6 +312,10 @@ def p2Task(k, value, context):
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
         logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+
+        # exporting the "nice version" of AOI        
+        logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
+        
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
     if "ocr" in value: 
@@ -334,13 +340,13 @@ def p2Task(k, value, context):
             logging.error("Error doing OCR. Key="+str(k)+" value="+str(value)+txt)
             return True
         # log the text values
-        logging.info(txt+"\tOCR: context="+str(context)+"\tcoord="+str(coord)+"\tconfidence="+str(tess.confidence)+"\ttext='"+ ocrtext[:15]+"'")
+        logging.info("OCR\t"+txt+"\tcontext='"+str(context)+"'\tcoord='"+str(coord)+"'\tconfidence="+str(tess.confidence)+"\ttext='"+ ocrtext[:15]+"'")
         html=tess.getHtml() # log the HTML values
         # logging OCR results?
         if "ocrLogText" in yamlconfig["study"] and yamlconfig["study"]["ocrLogText"]:
-            logging.info("\nOCR TEXT BEGIN:\n"+ocrtext+"\nOCR TEXT END:\n")
+            logging.info("OCRTEXTBGIN\t"+ocrtext+"\tOCRTEXTEND:\n")
         if "ocrLogHTML" in yamlconfig["study"] and yamlconfig["study"]["ocrLogHTML"]:
-            logging.info("\nAOI BEGIN:\n"+html+"\nAOI END:\n")
+            logging.info("\nOCRAOIBEGIN:\n"+html+"\nOCRAOIEND:\n")
         # set the ocr offset and pagetitle and export data
         # see if we need to export AOI
         if "outputAOI" in yamlconfig["study"] and yamlconfig["study"]["outputAOI"]:
@@ -419,7 +425,7 @@ def processVideo(v):
     # create new log for the file v
     logfilename = os.getcwd()+"\\"+str(v)+"_AOI.log"
     #logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(asctime)s\t%(message)s', level=logging.DEBUG)
-    logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logging.DEBUG)
+    logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logging.INFO)
     print("OpenLogger "+logfilename)
     logging.info("\n\n======================================================")
 

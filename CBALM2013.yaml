@@ -538,7 +538,7 @@ tasks:
         break: true
     Assessment:
         #match: CBALM_sig.png, 0.01
-        match: MSQ10ALT.png
+        match: CBALM.png
         sourceLoc: 871, 248, 193, 64
         unmatchLog: Assessment signature not found
         # log: taskName='assessment'
