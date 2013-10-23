@@ -30,6 +30,7 @@
 #           this specifies the subimage that will be used as the signature. 
 #           and by default, match will first tries to do a image match at this location in the dest image
 #           if this fails, it will do an exhaustive template matching
+#       unmatchLog: string to log in the case of unmatch; use this carefully
 #       currently we do a template match. 
 #       @@ we should consider a feature-based or a color-histgram method, 
 #       which may be faster and allow for Bayesian decisions on best matches
@@ -66,7 +67,7 @@ study:
 
     # Gaze/mouse Log file control
     # if True, will  read gaze/mouse log files; if False, will do video processing only
-    processGaze# log: False
+    processGazeLog: False
     # gazeProcessingScript: "eyelog2dat_Tobii.awk"
     # logFileSuffix: "-All-Data.tsv"
 
@@ -533,12 +534,13 @@ tasks:
         track: simusig.png, 0.02
         #threshold: 0.01
         relativeAOI: 0, 0, 785, 573
-        # log: SimulationToolActivated
+        log: SimulationToolActivated
         break: true
     Assessment:
         #match: CBALM_sig.png, 0.01
         match: MSQ10ALT.png
         sourceLoc: 871, 248, 193, 64
+        unmatchLog: Assessment signature not found
         # log: taskName='assessment'
         ocr: 617, 281 ,49, 16
         items: *assessmentItems
