@@ -8,14 +8,13 @@ and recognizing content on a video frame.
 
 import cv2
 import cv2.cv as cv
-import os
-import os.path
-import sys
+#import os
+#import sys
 import numpy as np
-import glob
+#import glob
 import logging
-import re
-import subprocess
+#import re
+#import subprocess
 
 
 # class for video comparisons
