@@ -38,6 +38,8 @@
 #       track: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
 #           we don't specify a location because it's unknown. @@ we could internally try to find in the vicinity
 #           of the last found, but that may not be necessary.
+#       relativeAOI: x1, y1, x2, y2: offsets of the aoi relative to the topleft corner of the matched signature
+#           i.e., once we found the track_signature, we add these numbers to get the true AOI.
 #       currently we do a template match. 
 #       @@ we should consider a feature-based or a color-histgram method, 
 #       which may be faster and allow for Bayesian decisions on best matches
@@ -48,7 +50,7 @@ study:
     studyName: CBAL_Math_2013
     startFrame: 1
     scalingRatio: 0.5
-    frameChangeThreshold: 4
+    frameChangeThreshold: 3
     matchTemplateThreshold: 0.02
     # for the skipping mode, # of seconds to skip in a greedy search
     jumpAhead: 0.5 
@@ -121,7 +123,7 @@ items: &assessmentItems
 
     MSPRACTICE:
         match: MSPRACTICE.png
-        sourceLoc: 537, 271, 144, 170
+        sourceLoc: 547, 326, 190, 130
         log: MSPRACTICE
         MSPRACTICETOOLBUTTON:
             log: MSPRACTICETOOLBUTTON
@@ -530,10 +532,13 @@ tasks:
     Simulation:
         track: simusig.png, 0.02
         #threshold: 0.01
+        relativeAOI: 0, 0, 785, 573
         log: SimulationToolActivated
         break: true
     Assessment:
-        match: CBALM_sig.png, 0.01
+        #match: CBALM_sig.png, 0.01
+        match: MSQ10ALT.png
+        sourceLoc: 871, 248, 193, 64
         log: taskName='assessment'
         ocr: 617, 281 ,49, 16
         items: *assessmentItems
