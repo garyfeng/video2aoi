@@ -189,6 +189,9 @@ def p2Task(k, value, context):
         if res is None:
             # no match found; stop processing child nodes
             logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
+            if "unmatchLog" in value:
+                # need to log this event
+                logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
             return None
             # @@ unreachable code: not going to double check using slow mapping
             # if sourceLoc is specified, let's now search the whole image
@@ -260,14 +263,43 @@ def p2Task(k, value, context):
         else:
             # found match, break; print "==== Match! ==" + fname
             taskSigLoc, minVal=res
-            logging.info("TRACK: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
-            h, w, clr= signatureImageDict[fname].shape
-            updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+
+            # if relativeAOI is specified, adjust the coords fo the AOI relative to taskSigLoc
+            coord=(0,0,100,100)
+            if "relativeAOI" in value:
+                # something like: sourceLoc: 836, 294, 256, 140
+                #logging.debug("TRACK: relativeAOI = "+str(value["relativeAOI"]))
+                coord = map(int, value["relativeAOI"].split(","))   # by default, in order x1, y1, x2, y2
+                #logging.debug("TRACK: parsed relativeAOI = "+str(len(coord)))
+
+                if "aoiFormat" in yamlconfig["study"]:
+                    if yamlconfig["study"]["aoiFormat"] == "xywh":
+                        # the x,y,w,h format: convert to xyxy format
+                        coord[2]=coord[2]+coord[0]
+                        coord[3]=coord[3]+coord[1]
+                coord[0]=coord[0]+ taskSigLoc[0]
+                coord[1]=coord[1]+ taskSigLoc[1]
+                coord[2]=coord[2]+ taskSigLoc[0]
+                coord[3]=coord[3]+ taskSigLoc[1]
+            else:
+                h, w, clr= signatureImageDict[fname].shape
+                coord[0]= taskSigLoc[0]
+                coord[1]= taskSigLoc[1]
+                coord[2]= w+ taskSigLoc[0]
+                coord[3]= h+ taskSigLoc[1]
+
+
+            logging.debug(txt+"\tTRACK: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+" relativeAOI="+str(coord)+"\tminVal="+str(minVal))
+            pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
+            logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+
+            updateAOI((str(fname), str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+
             
     # if successful match or NO match needed
     if "log" in value: 
         # simply log the message
-        logging.info("LOG: context="+str(context)+"\tmsg="+value["log"]+txt)
+        logging.info("LOG\t"+txt+"\tcontext="+str(context)+"\tmsg="+value["log"])
     if "aoi" in value:
         # an AOI defined directly by coordinates; will output and add the aoi for matching
         coord = map(int, value["aoi"].split(","))   # by default, in order x1, y1, x2, y2
@@ -277,7 +309,7 @@ def p2Task(k, value, context):
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
-        logging.info("AOI: pageTitle="+pageTitle+"\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+        logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
     if "ocr" in value: 
@@ -302,7 +334,7 @@ def p2Task(k, value, context):
             logging.error("Error doing OCR. Key="+str(k)+" value="+str(value)+txt)
             return True
         # log the text values
-        logging.info("OCR: context="+str(context)+"\tcoord="+str(coord)+"\tconfidence="+str(tess.confidence)+"\ttext='"+ ocrtext[:15]+"'" +txt)
+        logging.info(txt+"\tOCR: context="+str(context)+"\tcoord="+str(coord)+"\tconfidence="+str(tess.confidence)+"\ttext='"+ ocrtext[:15]+"'")
         html=tess.getHtml() # log the HTML values
         # logging OCR results?
         if "ocrLogText" in yamlconfig["study"] and yamlconfig["study"]["ocrLogText"]:
@@ -330,7 +362,7 @@ def p2Task(k, value, context):
             cv2.imwrite(fname, frame)
         except:
             logging.error("Error writing the current frame as a screenshot to file ="+str(fname))
-        logging.info("Screenshot f='"+fname+"'"+txt)
+        logging.info(txt+"\tScreenshot f='"+fname+"'"+txt)
     # Dealing with special commands: break, to not continue processing the rest of the list
     # if "break" in value:
     if "break" in k:
@@ -516,6 +548,7 @@ def processVideo(v):
         # jumpping forward multiple frames (e.g., using the slidebar); we stop the skimmingMode
         # if lastCounter is way ahead of frameNum, it's clear that it's caused by user rewind; reset
         if lastCounter<frameNum-1 or lastCounter >frameNum + skimFrames+1: 
+            logging.info("Video jumpping: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode))
             lastCounter = frameNum
             skimmingMode = False
 
@@ -568,7 +601,7 @@ def processVideo(v):
             if (frameChanged and skimmingMode and frameNum>skimFrames):
                 # now we need to rewind and redo this in the normal mode
                 skimmingMode = False
-                lastCounter = frameNum   #lastCounter tracks where we have skimmed to
+                lastCounter = frameNum+1   #lastCounter tracks where we have skimmed to, but add 1, else in rare cases it's thrown into a loop
                 frameNum = frameNum-skimFrames
                 video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
                 logging.debug("SkimmingMode: Changed detected; going back\tskimmingMode="+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
