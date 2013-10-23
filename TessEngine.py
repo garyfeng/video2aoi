@@ -19,6 +19,7 @@ from htmlentitydefs import name2codepoint
 import cv2
 import cv2.cv as cv
 import logging
+import re
 
 class TessEngine:
     tess = None
@@ -153,7 +154,7 @@ class TessHTMLParser(HTMLParser):
                 if self.callbackfunc is not None:
                     self.callbackfunc((self.ocrPageTitle, self.id, str(c), self.box[0], self.box[1], self.box[2], self.box[3]))
             else:
-                logging.info( "AOI error: handle_entityref expecting a word element here")
+                logging.error( "AOI error: handle_entityref expecting a word element here")
         return
         
     def handle_charref(self, name):
@@ -169,7 +170,7 @@ class TessHTMLParser(HTMLParser):
                 if self.callbackfunc is not None:
                     self.callbackfunc((self.ocrPageTitle, self.id, str(c),  self.box[0], self.box[1], self.box[2], self.box[3]))
             else:
-                logging.info( "AOI error: handle_charref expecting a word element here")
+                logging.error( "AOI error: handle_charref expecting a word element here")
         return
             
     def handle_decl(self, data):

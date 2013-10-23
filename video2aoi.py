@@ -504,16 +504,21 @@ def processVideo(v):
         frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
         # lastCounter tracks the greedy jumpahead position, which should be within skimFrames
         # when in skimmingMode, both of these should advance; this includes when the user jumps ahead with the slider
+        logging.debug("V: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode))
+        
+        # normal case, reading one frame at once
         if lastCounter==frameNum-1: lastCounter = frameNum
-        # @@ if moved forward, set skimmingMode = False
-        #if lastCounter<frameNum-1:
-        #    skimmingMode= False@@
-        # if lastCounter is way ahead of frameNum, it's clear that it's caused by user rewind; reset
-        if lastCounter - frameNum > skimFrames+10: lastCounter = frameNum
         # if in the refined search mode and the frameNum catches with lastCounter, then we resume skimming
         if not skimmingMode and frameNum == lastCounter :
             # not in skimmingMode but we have scanned all the frames in between
             skimmingMode = True
+
+        # jumpping forward multiple frames (e.g., using the slidebar); we stop the skimmingMode
+        # if lastCounter is way ahead of frameNum, it's clear that it's caused by user rewind; reset
+        if lastCounter<frameNum-1 or lastCounter >frameNum + skimFrames+1: 
+            lastCounter = frameNum
+            skimmingMode = False
+
         # skipping frames at a time
         if skimmingMode and frameNum % skimFrames >0 : continue
         
@@ -559,13 +564,15 @@ def processVideo(v):
             # now only process when there is a large change
             ################################################
             frameChanged = frameEngine.frameChanged(frame)
-            # logging.info("SkimmingMode ="+str(skimmingMode)+", lastCounter= "+str(lastCounter)+" frameNum= "+str(frameNum)+" skimFrames= "+str(skimFrames))
+            # logging.debug("SkimmingMode ="+str(skimmingMode)+", lastCounter= "+str(lastCounter)+" frameNum= "+str(frameNum)+" skimFrames= "+str(skimFrames))
             if (frameChanged and skimmingMode and frameNum>skimFrames):
                 # now we need to rewind and redo this in the normal mode
                 skimmingMode = False
-                lastCounter = frameNum+1   #lastCounter tracks where we have skimmed to
-                video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum-skimFrames)
-                logging.info("SkimmingMode:\t"+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
+                lastCounter = frameNum   #lastCounter tracks where we have skimmed to
+                frameNum = frameNum-skimFrames
+                video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
+                logging.debug("SkimmingMode: Changed detected; going back\tskimmingMode="+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
+                # going back, rewind
                 continue
                 
             #if (frameEngine.frameChanged(cv2.resize(frame, (0,0), fx= 0.25, fy=0.25)) or forcedCalc): #no significant performance gain
@@ -727,16 +734,8 @@ if __name__ == "__main__":
     frameEngine.frameChangeThreshold=yamlconfig["study"]["frameChangeThreshold"]
     frameEngine.matchTemplateThreshold=float(yamlconfig["study"]["matchTemplateThreshold"])
 
-        
-    #use logger
-    #logfilename =os.path.dirname(sys.argv[0])+"\\cv2video.log"
-    #logging.basicConfig(filename=logfilename, format='%(message)s', level=logging.DEBUG)
-    #print("OpenLogger "+logfilename)
-    #logging.info("==============================================================\n\n")
-    #logging.info("OpenCV version = "+str(cv2.__version__))
 
-
-    # init vars
+    # init global vars
     startFrame= yamlconfig["study"]["startFrame"]
     #forcedCalc=False
     lastFrame=None

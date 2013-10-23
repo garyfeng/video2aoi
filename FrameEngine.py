@@ -111,24 +111,29 @@ class FrameEngine:
             
         if self.lastFrame is None:
             # lastFrame not set
-            self.lastFrame = vframe
-            logging.info( "frameChanged: First frame or starting SkimmingMode")
+            #self.lastFrame = vframe
+            # the above is a reference; use numpy copy
+            self.lastFrame = np.copy(vframe)
+            logging.debug( "frameChanged: First frame or starting SkimmingMode")
             return True
         if self.lastFrame.shape != vframe.shape:
             # current frame is different from lastFrame in size or color depth; reset last frame
-            self.lastFrame = vframe
-            logging.info( "frameChanged: Error: lastFrame of different size")
+            #self.lastFrame = vframe
+            # the above is a reference; use numpy copy
+            self.lastFrame = np.copy(vframe)
+            logging.error( "frameChanged: Error: lastFrame of different size")
             return True
         diffFrame = cv2.absdiff(vframe, self.lastFrame)
         #debug
         #print (str(self.frameChangeThreshold)+" - "+str( np.mean(diffFrame)))
         
-        self.lastFrame = vframe # update frame
+        #self.lastFrame = vframe # update frame
+        self.lastFrame = np.copy(vframe)
         if (np.mean(diffFrame) <self.frameChangeThreshold):
-            #logging.info( "frameChanged: Change not big enough" +str( np.mean(diffFrame)))
+            logging.debug( "frameChanged: Change not big enough " +str( np.mean(diffFrame)))
             return False
         else:
-            logging.info( "frameChanged: Changed " + str( np.mean(diffFrame)))
+            logging.debug( "frameChanged: Changed " + str( np.mean(diffFrame)))
             return True
 
     def featureMatch (self, template, r_threshold = 0.6):
@@ -174,7 +179,7 @@ class FrameEngine:
        
         desc1.shape = (-1, detector.descriptorSize())
         desc2.shape = (-1, detector.descriptorSize())
-        logging.info('featureMatch: image - '+str(len(kp1))+' features, template - '+str(len(kp2))+' features')
+        logging.debug('featureMatch: image - '+str(len(kp1))+' features, template - '+str(len(kp2))+' features')
         
         # FLANN
 #        # potential code for integrating more openCV options here
@@ -207,7 +212,7 @@ class FrameEngine:
         matched_p2 = np.array([kp2[j].pt for i, j in m])
         
         H, status = cv2.findHomography(matched_p1, matched_p2, cv2.RANSAC, 5.0)
-        logging.info( 'featureMatch: %d / %d  inliers/matched' % (np.sum(status), len(status)))
+        logging.debug( 'featureMatch: %d / %d  inliers/matched' % (np.sum(status), len(status)))
 
         if H is None: 
             logging.error("featureMatch: error no match was found; reset self.scrollImage")
