@@ -1,3 +1,11 @@
+# User defined
+*.mkv
+*.avi
+*.png
+*.log
+*.sublime-workspace
+*.sublime-project
+
 #################
 ## Eclipse
 #################
