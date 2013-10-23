@@ -42,11 +42,14 @@ def updateAOI (data):
         
 # funcs to process the YAML config file
 signatureImageDict={}
-def p2ReadSignatureImage(k, fname, c):
+def p2ReadSignatureImage(k, value, c):
     '''Takes a key, a value (file name), and a context, and reads the image if key="match" or "track"
     then updates the global dict signatureImageDict'''
     global signatureImageDict
     
+    if not isinstance(value, dict):
+        # not a dict, no need to process
+        return True
     
     # set colorplane choices
     colorPlane = -99; #use all colors
@@ -63,22 +66,47 @@ def p2ReadSignatureImage(k, fname, c):
             colorPlane = -1
     #logging.info("ColorPlane = "+str(colorPlane))
 
-    
-    # now get the last key, and if it's not "match" then return True to move to the next node
-    if not k=="match" and not k=="track": 
-        return True
+    # use the same YAML parsing method as p2Task()
     img = None
-    # parse fname, because there may be optional parameters
-    fname=fname.split(",")[0]
+    if "match" in value:
+        para=value["match"].split(",")
+    elif "track" in value:
+        para=value["track"].split(",")
+    else:
+        # not not something we want to process
+        #logging.error("p2ReadSignatureImage: expecting match or track but got "+str(value))
+        return True
 
+    fname = para[0]
+    if not isinstance(fname, str): 
+        logging.error("p2ReadSignatureImage: expecting a filename but got "+str(fname))
+        return True
+    # if image path name is specified, can be absolute or relative
     if "imgFilePath" in yamlconfig["study"].keys():
         fname = os.path.join(yamlconfig["study"]["imgFilePath"], fname)
+
+    # now read the image
     try:
         img = cv2.imread(fname)
+        # check for optional sourceLoc parameters
         logging.info("p2ReadSignatureImage: reading image file="+str(fname))
     except:
-        logging.error("Error p2ReadSignatureImage: error reading image file="+str(fname))
+        logging.error("p2ReadSignatureImage: error reading image file="+str(fname))
         return True
+    # extract the signature if sourceLoc is specified
+    # this means that (a) fname is the src and (b) match will be attempted at this perceise location
+    coord=[]
+    if "sourceLoc" in value:
+        # something like: sourceLoc: 836, 294, 256, 140
+        coord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
+        if "aoiFormat" in yamlconfig["study"]:
+            if yamlconfig["study"]["aoiFormat"] == "xywh":
+                # the x,y,w,h format: convert to xyxy format
+                coord[2]=coord[2]+coord[0]+1
+                coord[3]=coord[3]+coord[1]+1
+        # now get the sig from the source image
+        img= img[coord[1]:coord[3], coord[0]:coord[2]]
+
     # convert frame to single channel if needed
     if len(img.shape)>2 and colorPlane == -1:
         # grayscale
@@ -125,7 +153,7 @@ def p2Task(k, value, context):
             return True
 
         # assuming the signature is the fname image, unless sourceLoc is specified later
-        sig=np.copy(signatureImageDict[fname])
+        sig=signatureImageDict[fname]
 
         # optional threshold parameter
         threshold = -99        
@@ -135,7 +163,9 @@ def p2Task(k, value, context):
             except:
                 logging.error("MATCH: expecting a float number but got "+str(value["match"].split(",")[1]))
                 return True
-        # check for optional sourceLoc parameters
+        # extract the signature if sourceLoc is specified
+        # this means that (a) fname is the src and (b) match will be attempted at this perceise location
+        img=np.copy(frame)
         coord=[]
         if "sourceLoc" in value:
             # something like: sourceLoc: 836, 294, 256, 140
@@ -146,21 +176,16 @@ def p2Task(k, value, context):
                     coord[2]=coord[2]+coord[0]+1
                     coord[3]=coord[3]+coord[1]+1
             # now get the sig from the source image
-            sig= np.copy(signatureImageDict[fname][coord[1]:coord[3], coord[0]:coord[2]])
+            img= frame[coord[1]:coord[3], coord[0]:coord[2]]
 
         # now let's find the template
         if threshold == -99:
             # use the global default threshold
-            res = frameEngine.findMatch(frame, sig)
+            res = frameEngine.findMatch(img, sig)
         else:
             # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(frame, sig, threshold)
+            res = frameEngine.findMatch(img, sig, threshold)
         
-        if not res is None: 
-            logging.debug("Lucky match using sourceLoc at "+str(coord))
-        else:
-            logging.debug("Didn't find using sourceLoc at "+str(coord))
-
         if res is None:
             # no match found; stop processing child nodes
             logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
@@ -188,7 +213,12 @@ def p2Task(k, value, context):
         logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
         # @@ temporarily adding boxes for matching signatures. 
         h, w, clr= sig.shape
-        updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+        #@@ need to use coord()
+        if "sourceLoc" in value:
+            updateAOI((str(fname), str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        else:
+            updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+
             
     # track is like match in using templatematching, but it adds the object to the aoilist        
     if "track" in value:
@@ -590,7 +620,7 @@ def processVideo(v):
             if showVideo:
                 text_color = (128,128,128)
                 txt = txt+"\t"+str(parser.ocrPageTitle)
-                cv2.putText(frame, txt, (20,50), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
+                cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
                 # display rect for aoilist elements
                 if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
                     if aoilist is not None:
