@@ -124,6 +124,9 @@ def p2Task(k, value, context):
             logging.error("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
             return True
 
+        # assuming the signature is the fname image, unless sourceLoc is specified later
+        sig=np.copy(signatureImageDict[fname])
+
         # optional threshold parameter
         threshold = -99        
         if len(para)==2:
@@ -132,27 +135,60 @@ def p2Task(k, value, context):
             except:
                 logging.error("MATCH: expecting a float number but got "+str(value["match"].split(",")[1]))
                 return True
+        # check for optional sourceLoc parameters
+        coord=[]
+        if "sourceLoc" in value:
+            # something like: sourceLoc: 836, 294, 256, 140
+            coord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
+            if "aoiFormat" in yamlconfig["study"]:
+                if yamlconfig["study"]["aoiFormat"] == "xywh":
+                    # the x,y,w,h format: convert to xyxy format
+                    coord[2]=coord[2]+coord[0]+1
+                    coord[3]=coord[3]+coord[1]+1
+            # now get the sig from the source image
+            sig= np.copy(signatureImageDict[fname][coord[1]:coord[3], coord[0]:coord[2]])
 
         # now let's find the template
         if threshold == -99:
             # use the global default threshold
-            res = frameEngine.findMatch(frame, signatureImageDict[fname])
+            res = frameEngine.findMatch(frame, sig)
         else:
             # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(frame, signatureImageDict[fname], threshold)
-            
+            res = frameEngine.findMatch(frame, sig, threshold)
+        
+        if not res is None: 
+            logging.debug("Lucky match using sourceLoc at "+str(coord))
+        else:
+            logging.debug("Didn't find using sourceLoc at "+str(coord))
+
         if res is None:
             # no match found; stop processing child nodes
             logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
             return None
+            # @@ unreachable code: not going to double check using slow mapping
+            # if sourceLoc is specified, let's now search the whole image
+            if "sourceLoc" in value:
+                sig=np.copy(signatureImageDict[fname])
+                # now let's find the template
+                if threshold == -99:
+                    # use the global default threshold
+                    res = frameEngine.findMatch(frame, sig)
+                else:
+                    # a new threshold is specified in the YAML file
+                    res = frameEngine.findMatch(frame, sig, threshold)
+            if res is None:
+                # if it's still None, or if it's still None,
+                # no match found; stop processing child nodes
+                logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
+                return None
         # if match fails, move to the next match; only proceed if Match succeeded
-        else:
-            # found match, break; print "==== Match! ==" + fname
-            taskSigLoc, minVal=res
-            logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
-            # @@ temporarily adding boxes for matching signatures. 
-            h, w, clr= signatureImageDict[fname].shape
-            updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+
+        # found match, whether it's the sourceLoc or the original image; 
+        taskSigLoc, minVal=res
+        logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
+        # @@ temporarily adding boxes for matching signatures. 
+        h, w, clr= sig.shape
+        updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
             
     # track is like match in using templatematching, but it adds the object to the aoilist        
     if "track" in value:
