@@ -19,5 +19,5 @@ BEGIN {
     # data format for the iohub _eye.log
     # x, y, t
     if (NR==1) {start=$3}
-    print int(($3-start)*1000), "gaze", int($1), int($2), ""
+    print int(($3-start)*1000), "gaze", int($1), int($2), NR
 }
