@@ -513,7 +513,7 @@ def processVideo(v):
     gazex=-999; gazey=-999; gazetime =0; lastGazetime=-999
     # set the flag for skimmingMode
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
-    aoilist=[]; dump=[]; lastCounter=0
+    aoilist=[]; dump=[]; lastCounter=0; lastVTime=0;
     
     # set colorplane choices
     colorPlane = -99; #use all colors
@@ -632,9 +632,12 @@ def processVideo(v):
                   # of the "activation" on each AOI over time
 
                 # the original algorithm only gets the last gaze sample 
-                # we need to report on all gaze samples that fall between this and last video frames, that is, [vtime-1000/fps, vtime]
+                # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
                 # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
-                temp = gaze[np.where(np.logical_and(gaze.t>vTime-int(1000/fps)+toffset, gaze.t<=vTime+toffset))]   
+                temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
+                print str(lastVTime) +"-"+str(vTime) +"="+ str(vTime-lastVTime)
+
+                lastVTime = vTime   # used to track gazes during skimming.
                 for g in temp:
                     gazetime= g["t"]
                     gazex=int(g["x"])
@@ -658,11 +661,13 @@ def processVideo(v):
                                     # skip templates for matching or tracking
                                     logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+"\t".join([str(s) for s in aoi]))
                         else:
-                            # gaze is not on an AOI
-                            logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
+                            # gaze is not on an AOI; print out the name of the page; keep in mind that aoilist[0] is the match template 
+                            logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[-1]["page"])+"\t\t\t\t\t\t")
                     else:
                         # invalid gazex or gazey
                         logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
+
+                    # tracking things here
                     lastGazetime=gazetime     
 
             # end of AOI
