@@ -210,9 +210,9 @@ def p2Task(k, value, context):
         h, w, clr= sig.shape
         #@@ need to use coord()
         if "sourceLoc" in value:
-            updateAOI((str(fname), str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+            updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
         else:
-            updateAOI((str(fname), str(k), str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+            updateAOI((str(fname), "__MATCH__", str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
 
             
     # track is like match in using templatematching, but it adds the object to the aoilist        
@@ -287,7 +287,7 @@ def p2Task(k, value, context):
             # exporting the "nice version" of AOI
             logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
 
-            updateAOI((str(fname), str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+            updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
 
             
     # if successful match or NO match needed
@@ -623,34 +623,48 @@ def processVideo(v):
             ##############################
             # AOI logging
             ##############################
-            # disabled
-            if processGazeLog and (gaze is not None and len(gaze) > 1 and len(aoilist)>1):
+            if processGazeLog and (gaze is not None and len(gaze) > 1):
                 # @@ this is where we should recalibrate 
                 # (a) redefine lineHeight and wordWidth so that no gap is left
                 # (b) get heatmap and estimate distribution to the left and top
                   # edges and other "good features"; calc teh best fit
                 # (c) does kernalDensity or bleeding, so that we get a matrix
                   # of the "activation" on each AOI over time
-                temp = gaze[np.where(gaze.t<=vTime+toffset)]   
-                if len(temp)>0:
-                    # found at least 1 match
-                    gazetime= temp.t[-1]
-                    gazex=int(temp.x[-1])
-                    gazey=int(temp.y[-1])
-                # now need to find the AOI and log it
-                # this means that the p2Task() need to have a global AOI array
-                if not np.isnan(gazex+gazey)  and gazetime !=lastGazetime:
-                    dump=aoilist[np.where(aoilist.x1<=gazex )]
-                    dump=dump[np.where(dump.x2>gazex)]
-                    dump=dump[np.where(dump.y1<=gazey)]
-                    dump=dump[np.where(dump.y2>gazey)]
-                    if len(dump)>0:
-                        for aoi in dump:
-                            logging.info("Gaze: vt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\taoi="+"\t".join([str(s) for s in aoi]))
+
+                # the original algorithm only gets the last gaze sample 
+                # we need to report on all gaze samples that fall between this and last video frames, that is, [vtime-1000/fps, vtime]
+                # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
+                temp = gaze[np.where(np.logical_and(gaze.t>vTime-int(1000/fps)+toffset, gaze.t<=vTime+toffset))]   
+                for g in temp:
+                    gazetime= g["t"]
+                    gazex=int(g["x"])
+                    gazey=int(g["y"])
+                    gazeinfo= g["info"]
+
+                    # now need to find the AOI and log it
+                    # this means that the p2Task() need to have a global AOI array
+                    if  len(aoilist)<1:
+                        # a page without AOI, mostly likely junk 
+                        logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
+                    elif not np.isnan(gazex+gazey)  and gazetime !=lastGazetime:
+                        # aoilist is defined
+                        dump=aoilist[np.where(aoilist.x1<=gazex )]
+                        dump=dump[np.where(dump.x2>gazex)]
+                        dump=dump[np.where(dump.y1<=gazey)]
+                        dump=dump[np.where(dump.y2>gazey)]
+                        if len(dump)>0:
+                            for aoi in dump:
+                                if not "__MATCH__" in aoi["id"]:
+                                    # skip templates for matching or tracking
+                                    logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+"\t".join([str(s) for s in aoi]))
+                        else:
+                            # gaze is not on an AOI
+                            logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
                     else:
-                        # gaze is not on an AOI
-                        logging.info("Gaze: vt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\taoi=")
+                        # invalid gazex or gazey
+                        logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
                     lastGazetime=gazetime     
+
             # end of AOI
             ############################
             # display video
@@ -663,7 +677,12 @@ def processVideo(v):
                 if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
                     if aoilist is not None:
                         for d in aoilist:
-                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
+                            if "__MATCH__" in d["id"]:
+                                # matching or tracking images
+                                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
+                            else:
+                                # actual AOIs
+                                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
                             
                 # shows the gaze circle
                 if not np.isnan(gazex+gazey): 
@@ -672,14 +691,18 @@ def processVideo(v):
                 # displays the AOI of the last matched object
                 if len(dump)>0: 
                     for d in dump:
-                        cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,text_color, 2)
-                    cv2.rectangle(frame, (dump.x1[-1], dump.y1[-1]), (dump.x2[-1], dump.y2[-1]) ,text_color,2)
+                        if not "__MATCH__" in d["id"]:
+                            # actual active AOIs
+                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
+
+                    #cv2.rectangle(frame, (dump.x1[-1], dump.y1[-1]), (dump.x2[-1], dump.y2[-1]), text_color,2)
                 # now show mouse, last pos; used to estimate toffset
                 #curmouse = mouse[np.where(mouse.t<=vTime+ toffset)]
                 curmouse = None
-                if gaze is not None: curmouse = gaze[np.where(gaze.t<=vTime+ toffset)]
-                if curmouse is not None and len(curmouse)>1: 
-                    cv2.circle(frame, (int(curmouse.x[-1]), int(curmouse.y[-1])), 10, text_color, -1)
+                if gaze is not None: 
+                    curmouse = gaze[np.where(gaze.t<=vTime+ toffset)]
+                    if curmouse is not None and len(curmouse)>0: 
+                        cv2.circle(frame, (int(curmouse.x[-1]), int(curmouse.y[-1])), 10, (0,0,255), -1)
                     
                 cv2.imshow(windowName, frame)       # main window with video control
                 #if txtScrollImage is not None: cv2.imshow("txtScrollImage", txtScrollImage)
