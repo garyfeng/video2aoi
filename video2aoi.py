@@ -4,17 +4,9 @@ import os
 import os.path
 import sys
 import numpy as np
-#import atexit
 import glob
 import logging
-#import re
 import subprocess
-
-# import tesseract
-# from HTMLParser import HTMLParser
-# from htmlentitydefs import name2codepoint
-
-# from csv import reader
 
 from TessEngine import *    #TessEngine, TessHTMLParser, imgTessHTMLParser
 from FrameEngine import *    #FrameEngine
