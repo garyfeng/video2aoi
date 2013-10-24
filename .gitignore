@@ -5,6 +5,7 @@
 *.log
 *.sublime-workspace
 *.sublime-project
+*.txt
 
 #################
 ## Eclipse

@@ -283,7 +283,7 @@ def p2Task(k, value, context):
 
             logging.debug(txt+"\tTRACK: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+" relativeAOI="+str(coord)+"\tminVal="+str(minVal))
             pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
-            logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+            #logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
             # exporting the "nice version" of AOI
             logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
 
@@ -303,7 +303,7 @@ def p2Task(k, value, context):
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
-        logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
+        #logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
 
         # exporting the "nice version" of AOI        
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
@@ -532,6 +532,8 @@ def processVideo(v):
     # now loop through the frames
     while video.grab():
         frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
+        videoHeadMoved = False    # this is used to keep track of video seeking
+
         # lastCounter tracks the greedy jumpahead position, which should be within skimFrames
         # when in skimmingMode, both of these should advance; this includes when the user jumps ahead with the slider
         logging.debug("V: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode))
@@ -549,6 +551,7 @@ def processVideo(v):
             logging.info("Video jumpping: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode))
             lastCounter = frameNum
             skimmingMode = False
+            videoHeadMoved = True
 
         # skipping frames at a time
         if skimmingMode and frameNum % skimFrames >0 : continue
@@ -570,7 +573,10 @@ def processVideo(v):
         if flag:
             # captions
             vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
-            #frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
+            if videoHeadMoved: 
+                lastVTime = vTime     # otherwise whenever there is a jump we will export all the gaze in between.
+
+           #frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
             txt="\tvideo='"+v+"'\tt="+str(vTime) +'\tframe='+str(frameNum)
 
             ##############################
@@ -635,7 +641,7 @@ def processVideo(v):
                 # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
                 # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
                 temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
-                print str(lastVTime) +"-"+str(vTime) +"="+ str(vTime-lastVTime)
+                #print str(lastVTime) +"-"+str(vTime) +"="+ str(vTime-lastVTime)
 
                 lastVTime = vTime   # used to track gazes during skimming.
                 for g in temp:
@@ -644,11 +650,17 @@ def processVideo(v):
                     gazey=int(g["y"])
                     gazeinfo= g["info"]
 
+                    # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
+                    # if we use vTime in the output, we can't tell the exact video time
+                    # so we back calculate here from gt:
+                    videoTime = gazetime -toffset
+
                     # now need to find the AOI and log it
                     # this means that the p2Task() need to have a global AOI array
                     if  len(aoilist)<1:
                         # a page without AOI, mostly likely junk 
-                        logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
+                        #logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
+                        logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
                     elif not np.isnan(gazex+gazey)  and gazetime !=lastGazetime:
                         # aoilist is defined
                         dump=aoilist[np.where(aoilist.x1<=gazex )]
@@ -659,13 +671,13 @@ def processVideo(v):
                             for aoi in dump:
                                 if not "__MATCH__" in aoi["id"]:
                                     # skip templates for matching or tracking
-                                    logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+"\t".join([str(s) for s in aoi]))
+                                    logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+"\t".join([str(s) for s in aoi]))
                         else:
                             # gaze is not on an AOI; print out the name of the page; keep in mind that aoilist[0] is the match template 
-                            logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[-1]["page"])+"\t\t\t\t\t\t")
+                            logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[-1]["page"])+"\t\t\t\t\t\t")
                     else:
                         # invalid gazex or gazey
-                        logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
+                        logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
 
                     # tracking things here
                     lastGazetime=gazetime     
