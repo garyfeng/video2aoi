@@ -542,6 +542,6 @@ tasks:
         sourceLoc: 871, 248, 193, 64
         unmatchLog: Assessment signature not found
         # log: taskName='assessment'
-        ocr: 617, 281 ,49, 16
+        # ocr: 617, 281 ,49, 16
         items: *assessmentItems
 
