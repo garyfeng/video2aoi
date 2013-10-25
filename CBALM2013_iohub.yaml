@@ -51,7 +51,11 @@ study:
     studyName: CBAL_Math_2013
     startFrame: 1
     scalingRatio: 0.5
-    frameChangeThreshold: 3
+    # did a look at the distribution of frameChange in cbalm49.avi, and looks like 
+    # a value of 1 will get ~20 more check points than =3 but will surely catch 
+    # most false negatives. 
+    frameChangeThreshold: 1
+    # this the global parameter that can be fine-tuned
     matchTemplateThreshold: 0.02
     # for the skipping mode, # of seconds to skip in a greedy search
     jumpAhead: 0.5 
