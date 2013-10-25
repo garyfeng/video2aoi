@@ -180,11 +180,12 @@ def p2Task(k, value, context):
         
         if res is None:
             # no match found; stop processing child nodes
-            logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
+            logging.debug("MATCH: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
             if "unmatchLog" in value:
                 # need to log this event
                 logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
             return None
+            """
             # @@ unreachable code: not going to double check using slow mapping
             # if sourceLoc is specified, let's now search the whole image
             if "sourceLoc" in value:
@@ -201,6 +202,7 @@ def p2Task(k, value, context):
                 # no match found; stop processing child nodes
                 logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
                 return None
+            """
         # if match fails, move to the next match; only proceed if Match succeeded
 
         # found match, whether it's the sourceLoc or the original image; 
@@ -228,7 +230,7 @@ def p2Task(k, value, context):
         if "imgFilePath" in yamlconfig["study"].keys():
             fname = os.path.join(yamlconfig["study"]["imgFilePath"], fname)
         if not (fname in signatureImageDict):
-            logging.error("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
+            logging.error("TRACK: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
             return True
         # optional threshold parameter
         threshold = -99        
@@ -249,7 +251,7 @@ def p2Task(k, value, context):
             
         if res is None:
             # no match found; stop processing child nodes
-            #logging.info("TRACK: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
+            logging.debug("TRACK:\tcontext="+str(context)+" fname="+str(fname)+" is not found in the current frame")
             return None
         # if match fails, move to the next match; only proceed if Match succeeded
         else:
@@ -257,7 +259,7 @@ def p2Task(k, value, context):
             taskSigLoc, minVal=res
 
             # if relativeAOI is specified, adjust the coords fo the AOI relative to taskSigLoc
-            coord=(0,0,100,100)
+            coord=[0,0,0,0]
             if "relativeAOI" in value:
                 # something like: sourceLoc: 836, 294, 256, 140
                 #logging.debug("TRACK: relativeAOI = "+str(value["relativeAOI"]))
@@ -281,7 +283,7 @@ def p2Task(k, value, context):
                 coord[3]= h+ taskSigLoc[1]
 
 
-            logging.debug(txt+"\tTRACK: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+" relativeAOI="+str(coord)+"\tminVal="+str(minVal))
+            logging.debug("TRACK:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(taskSigLoc)+" AOI="+str(coord)+"\tminVal="+str(minVal))
             pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
             #logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
             # exporting the "nice version" of AOI
@@ -416,8 +418,12 @@ def processVideo(v):
     
     # create new log for the file v
     logfilename = os.getcwd()+"\\"+str(v)+"_AOI.log"
+    logLevel = logging.INFO
+    if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"]:
+        logLevel= logging.DEBUG
     #logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(asctime)s\t%(message)s', level=logging.DEBUG)
-    logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logging.INFO)
+    logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logLevel)
+    
     print("OpenLogger "+logfilename)
     logging.info("\n\n======================================================")
 
@@ -440,6 +446,9 @@ def processVideo(v):
         return
     taskbarName="Video"
     if showVideo: cv2.createTrackbar(taskbarName, windowName, int(startFrame/100), int(nFrames/100+1), onChange)
+    # moving to the startFrame
+    video.set(cv.CV_CAP_PROP_POS_FRAMES, startFrame)
+
     # log
     logging.info("video = "+str(v)+"\tScaling ratio =" +str(ratio) +"\tlog = '"+str(logfilename)+"'")
     logging.info("VideoFrameSize = "+str(video.get(cv.CV_CAP_PROP_FRAME_WIDTH ))+"\t"+str(video.get(cv.CV_CAP_PROP_FRAME_HEIGHT )))
@@ -529,7 +538,10 @@ def processVideo(v):
         else:
             colorPlane = -1
     logging.info("ColorPlane = "+str(colorPlane))
+
+    ###############################
     # now loop through the frames
+    ###############################
     while video.grab():
         frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
         videoHeadMoved = False    # this is used to keep track of video seeking
@@ -552,8 +564,9 @@ def processVideo(v):
             lastCounter = frameNum
             skimmingMode = False
             videoHeadMoved = True
+            # here you don't want to clear the frameEngine.lastFrame, because you want to detect the first change.
 
-        # skipping frames at a time
+        # skimming mode: skipping frames at a time
         if skimmingMode and frameNum % skimFrames >0 : continue
         
         # read the frame
@@ -576,7 +589,6 @@ def processVideo(v):
             if videoHeadMoved: 
                 lastVTime = vTime     # otherwise whenever there is a jump we will export all the gaze in between.
 
-           #frameNum = video.get(cv.CV_CAP_PROP_POS_FRAMES)
             txt="\tvideo='"+v+"'\tt="+str(vTime) +'\tframe='+str(frameNum)
 
             ##############################
@@ -606,10 +618,11 @@ def processVideo(v):
                 # now we need to rewind and redo this in the normal mode
                 skimmingMode = False
                 lastCounter = frameNum+1   #lastCounter tracks where we have skimmed to, but add 1, else in rare cases it's thrown into a loop
-                frameNum = frameNum-skimFrames
+                frameNum = frameNum-skimFrames-1    # going back 1 more frame than before because we clearLastFrame() and need this to establish the baseline
                 video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
                 logging.debug("SkimmingMode: Changed detected; going back\tskimmingMode="+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
-                # going back, rewind
+                # going back, rewind to frameNum
+                frameEngine.clearLastFrame()    # clear the lastFrame buffer, so that the first rewinded frame will be taken as the template to compare with.
                 continue
                 
             #if (frameEngine.frameChanged(cv2.resize(frame, (0,0), fx= 0.25, fy=0.25)) or forcedCalc): #no significant performance gain
