@@ -1,0 +1,162 @@
+# yaml for video2aoi.py
+# Gary Feng, 2013, Princeton, NJ
+
+# requires:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# aoi: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# break: specify this if you don't want to continue processing 
+#       the rest of **sibling** items 
+#       following the **successful** processing of the current entry
+#       doesn't matter if you specify True or False, so long as it appears
+
+# match: always followed by a image filename, followed by options:
+#       match: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#       sourceLoc: x, y, w, h, or x1, y1, x2, y2, depending on "aoiFormat" 
+#           this specifies the subimage that will be used as the signature. 
+#           and by default, match will first tries to do a image match at this location in the dest image
+#           if this fails, it will do an exhaustive template matching
+#       unmatchLog: string to log in the case of unmatch; use this carefully
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# track: always followed by a image filename, followed by options:
+#       track: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#           we don't specify a location because it's unknown. @@ we could internally try to find in the vicinity
+#           of the last found, but that may not be necessary.
+#       relativeAOI: x1, y1, x2, y2: offsets of the aoi relative to the topleft corner of the matched signature
+#           i.e., once we found the track_signature, we add these numbers to get the true AOI.
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: CBAL_Math_2013
+    startFrame: 63000
+    scalingRatio: 0.5
+    frameChangeThreshold: 3
+    matchTemplateThreshold: 0.02
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0.5 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: 0  
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "."
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: False
+    gazeProcessingScript: "eyelog2dat_iohub.awk"
+    logFileSuffix: "_eye.log"
+
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+
+    # Show AOIs on the video?
+    displayAOI: True
+
+    # log level debug
+    logLevelDebug: True
+
+
+items: &assessmentItems
+    #Mouse:
+        #track: mouse1.png, 0.2
+        #threshold: 0.2
+        ## log: mouseFound
+
+    MSQ3:
+        match: MSQ3.png
+        sourceLoc: 977, 335, 166, 105
+        # log: MSQ3
+        MSQ3WARNING:
+            # Q3 can give you a warning when you try to add a 3rd point in the graphing tool
+            # (this may happen in other items with the graphing tool, too)
+            # need to track this; because the warning is movable. 
+            track: MSQ3_warning.png
+            log: MSQ3_warning Activated
+            # this will generate an AOI.
+        MSQ3LSIDE:
+            # log: MSQ3LSIDE
+            aoi: 449, 310, 374, 573
+        MSQ3MSIMAGE:
+            # log: MSQ3MSIMAGE
+            aoi: 499, 338, 275, 153
+        MSQ3TABLE:
+            # log: MSQ3TABLE
+            aoi: 511, 526, 253, 162
+        MSQ3RSIDE:
+            # log: MSQ3RSIDE
+            aoi: 822, 317, 650, 568
+        MSQ3DIRECTIONS:
+            # log: MSQ3DIRECTIONS
+            aoi: 822, 317, 650, 62
+        MSQ3TABLE:
+            # log: MSQ3TABLE
+            aoi: 874, 385, 522, 457
+        MSQ3LINEBOX:
+            # log: MSQ3LINEBOX
+            aoi: 1271, 445, 102, 36
+        MSQ3UNDOBOX:
+            # log: MSQ3UNDOBOX
+            aoi: 1271, 755, 101, 35
+        MSQ3STARTOVERBOX:
+            # log: MSQ3STARTOVERBOX
+            aoi: 1271, 801, 101, 32
+        break: true
+
+
+
+tasks:
+    Simulation:
+        track: simusig.png, 0.02
+        #threshold: 0.01
+        relativeAOI: 0, 0, 785, 573
+        log: SimulationToolActivated
+        break: true
+    Calculator:
+        track: calcsig3.png, 0.02
+        #threshold: 0.01
+        relativeAOI: 0, 0, 232, 289
+        log: CalculatorToolActivated
+    MSQ5WARNING:
+        # the warning sign that says you can't go back if you move on to the next item
+        # fortunately MSQ5 still matches even when it's grayed out a little bit, so we can put this here
+        # and also this one doesn't move
+        match: MSQ5_warning.png
+        sourceLoc: 510, 347, 839, 146
+        aoi: 510, 347, 902, 146
+
+    Assessment:
+        #match: CBALM_sig.png, 0.01
+        match: CBALM.png
+        sourceLoc: 871, 248, 193, 64
+        unmatchLog: Assessment signature not found
+        # log: taskName='assessment'
+        # ocr: 617, 281 ,49, 16
+        items: *assessmentItems
+

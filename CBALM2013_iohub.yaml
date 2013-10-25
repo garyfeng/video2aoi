@@ -79,6 +79,10 @@ study:
     # Show AOIs on the video?
     displayAOI: True
 
+    # log level debug: turn this on if you want to get a LOT of info in the log
+    # including frame by frame counts
+    # logLevelDebug: True
+
 
 items: &assessmentItems
     #Mouse:
@@ -210,6 +214,13 @@ items: &assessmentItems
         match: MSQ3.png
         sourceLoc: 977, 335, 166, 105
         # log: MSQ3
+        MSQ3WARNING:
+            # Q3 can give you a warning when you try to add a 3rd point in the graphing tool
+            # (this may happen in other items with the graphing tool, too)
+            # need to track this; because the warning is movable. 
+            track: MSq3_warning.png
+            log: MSq3_warning Activated
+            # this will generate an AOI.
         MSQ3LSIDE:
             # log: MSQ3LSIDE
             aoi: 449, 310, 374, 573
@@ -529,6 +540,7 @@ items: &assessmentItems
             # log: MSQ10Q&RB
             aoi: 978, 733, 475, 118
 
+
 tasks:
     Simulation:
         track: simusig.png, 0.02
@@ -536,6 +548,19 @@ tasks:
         relativeAOI: 0, 0, 785, 573
         log: SimulationToolActivated
         break: true
+    Calculator:
+        track: calcsig3.png, 0.02
+        #threshold: 0.01
+        relativeAOI: 0, 0, 232, 289
+        log: CalculatorToolActivated
+    MSQ5WARNING:
+        # the warning sign that says you can't go back if you move on to the next item
+        # fortunately MSQ5 still matches even when it's grayed out a little bit, so we can put this here
+        # and also this one doesn't move
+        match: MSQ5_warning.png
+        sourceLoc: 510, 347, 839, 146
+        aoi: 510, 347, 902, 146
+
     Assessment:
         #match: CBALM_sig.png, 0.01
         match: CBALM.png
@@ -544,4 +569,3 @@ tasks:
         # log: taskName='assessment'
         # ocr: 617, 281 ,49, 16
         items: *assessmentItems
-
