@@ -51,17 +51,23 @@ class FrameEngine:
 
     def __init__ (self):
         self.clearScrollImage()
+        self.clearLastFrame()
         return
     # ScrollImage is an image buffer to keep the reconstructed image when 
     # a region of a screen is defined as "scroll" in the YAML
     # we try to reconstruct the full image from the partial image in the current viewport 
     # over multiple scrolls. The goal is to define the AOI on the basis of the scrollImage.
-    def clearScrollImage (self):
-        self.scrollImage = None
-    def setScrollImage (self, img):
-        self.scrollImage = np.copy(img)  
     def getScrollImage (self):
         return self.scrollImage 
+    def setScrollImage (self, img):
+        self.scrollImage = np.copy(img)  
+    def clearScrollImage (self):
+        self.scrollImage = None
+
+    def getLastFrame (self):
+        return self.lastFrame
+    def setLastFrame (self, img):
+        self.lastFrame = np.copy(img)  
     def clearLastFrame (self):
         self.lastFrame = None
                             
@@ -113,7 +119,7 @@ class FrameEngine:
             #self.lastFrame = vframe
             # the above is a reference; use numpy copy
             self.lastFrame = np.copy(vframe)
-            logging.debug( "frameChanged: First frame or starting SkimmingMode")
+            logging.debug( "frameChanged: First frame or the lastFrame has been cleared")
             return True
         if self.lastFrame.shape != vframe.shape:
             # current frame is different from lastFrame in size or color depth; reset last frame
@@ -128,11 +134,14 @@ class FrameEngine:
         
         #self.lastFrame = vframe # update frame
         self.lastFrame = np.copy(vframe)
-        if (np.mean(diffFrame) <self.frameChangeThreshold):
-            logging.debug( "frameChanged: Change not big enough " +str( np.mean(diffFrame)))
+
+        # stat
+        stat = np.mean(diffFrame)
+        if (stat <self.frameChangeThreshold):
+            logging.debug( "frameChanged: Change not big enough " +str( stat))
             return False
         else:
-            logging.debug( "frameChanged: Changed " + str( np.mean(diffFrame)))
+            logging.debug( "frameChanged: Changed " + str( stat))
             return True
 
     def featureMatch (self, template, r_threshold = 0.6):
@@ -282,8 +291,8 @@ class FrameEngine:
 
         if (minV<threshold):
             # ignore small differences
-            logging.debug("findMatch: found match at "+str(minL)+", minVal="+str(minV)+"<threshold="+str(threshold))
+            logging.debug("findMatch: found match at "+str(minL)+", minVal="+str(minV)+" < threshold="+str(threshold))
             return minL, minV
         else:
-            logging.debug("findMatch: no match found; minVal="+str(minV)+">threshold="+str(threshold))
+            logging.debug("findMatch: no match found; minVal="+str(minV)+" > threshold="+str(threshold))
             return None
