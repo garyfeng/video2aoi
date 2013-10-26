@@ -788,7 +788,7 @@ def processVideo(v):
                     cv2.circle(frame, (int(gazex), int(gazey)), 20, text_color)
                 
                 # displays the AOI of the last matched object
-                if len(dump)>0: 
+                if not aoilist is  None and len(dump)>0: 
                     for d in dump:
                         if not "__MATCH__" in d["id"]:
                             # actual active AOIs
