@@ -251,17 +251,6 @@ def p2Task(k, value, context):
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
         updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
 
-        # # found match, whether it's the sourceLoc or the original image; 
-        # taskSigLoc, minVal=res
-        # logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
-        # # @@ temporarily adding boxes for matching signatures. 
-        # h, w, clr= sig.shape
-        # #@@ need to use coord()
-        # if "sourceLoc" in value:
-        #     updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
-        # else:
-        #     updateAOI((str(fname), "__MATCH__", str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
-
 
     # if successful match or NO match needed
     if "log" in value: 
@@ -541,7 +530,7 @@ def processVideo(v):
 
         # lastCounter tracks the greedy jumpahead position, which should be within skimFrames
         # when in skimmingMode, both of these should advance; this includes when the user jumps ahead with the slider
-        logging.debug("V: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode))
+        logging.debug("V: frameNum="+str(frameNum)+"\tlastCounter="+str(lastCounter)+"\tskimmingMode= "+str(skimmingMode)+"\tskimFrames= "+str(skimFrames))
         
         # normal case, reading one frame at once
         if lastCounter==frameNum-1: lastCounter = frameNum
@@ -627,9 +616,24 @@ def processVideo(v):
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
                 aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S20'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
                 aoilist = aoilist.view(np.recarray)
-                #if len(aoilist)>0:
-                #    logging.info("AOIDump\n"+str(aoilist[0])+"\nAOIDUMP END\n")
-                # done with the frame
+                # #if len(aoilist)>0:
+                # #    logging.info("AOIDump\n"+str(aoilist[0])+"\nAOIDUMP END\n")
+                # # let's fast forward if no AOI is found (skipping over junkscreens)
+                # if len(aoilist) > 0:
+                #     # standard skipping rate
+                #     skimFrames = int(jumpAhead * fps) 
+                # else:
+                #     # no AOI
+                #     # fast forward; the price to pay is more frame-by-frame comaprisions
+                #     if skimFrames > int(jumpAhead * fps):
+                #         # last batch was a fastforward with NO AOI, so let's assume we are in a long stretch
+                #         frameChanged = False
+                #     skimFrames = int(jumpAhead * fps) *5
+                #     skimmingMode = True
+
+                #     logging.debug("SkimmingMode: No AOI found, fast forwarding.\tskimmingMode="+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
+                #     frameEngine.clearLastFrame()    # clear the lastFrame buffer, so that the first rewinded frame will be taken as the template to compare with.
+                #     continue
 
             
             ##############################
