@@ -35,21 +35,11 @@
 #       @@ we should consider a feature-based or a color-histgram method, 
 #       which may be faster and allow for Bayesian decisions on best matches
 
-# track: always followed by a image filename, followed by options:
-#       track: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
-#           we don't specify a location because it's unknown. @@ we could internally try to find in the vicinity
-#           of the last found, but that may not be necessary.
-#       relativeAOI: x1, y1, x2, y2: offsets of the aoi relative to the topleft corner of the matched signature
-#           i.e., once we found the track_signature, we add these numbers to get the true AOI.
-#       currently we do a template match. 
-#       @@ we should consider a feature-based or a color-histgram method, 
-#       which may be faster and allow for Bayesian decisions on best matches
-
 # study-wide parameters
 
 study:
     studyName: CBAL_Math_2013
-    startFrame: 1
+    startFrame: 1200
     scalingRatio: 0.5
     # did a look at the distribution of frameChange in cbalm49.avi, and looks like 
     # a value of 1 will get ~20 more check points than =3 but will surely catch 
@@ -64,7 +54,7 @@ study:
     # videogazeoffset is how much the gaze is ahead of the video
     videogazeoffset: 0  
     # where image files are; can be relative path from the current directory
-    imgFilePath: "."
+    imgFilePath: "CBALM_iohub_sig"
     # we have 2 formats for entering AOI coordinates
     aoiFormat: "xywh"
     #aoiFormat: "x1y1x2y2"
@@ -85,12 +75,12 @@ study:
 
     # log level debug: turn this on if you want to get a LOT of info in the log
     # including frame by frame counts
-    # logLevelDebug: True
+    logLevelDebug: False
 
 
 items: &assessmentItems
     #Mouse:
-        #track: mouse1.png, 0.2
+        #match: mouse1.png, 0.2
         #threshold: 0.2
         ## log: mouseFound
 
@@ -104,7 +94,7 @@ items: &assessmentItems
         MSTITLENAVIGATION:
             # log: MSTITLENAVIGATION
             aoi: 1218, 244, 254, 68
-        MSTITLEPRE-ALGEBRA:
+        MSTITLEPREALGEBRA:
             # log: MSTITLEPRE-ALGEBRA
             aoi: 891, 372, 136, 27
         MSTITLEPARTII:
@@ -173,6 +163,8 @@ items: &assessmentItems
         MSQ1STARTSTOPRESET:
             # log: MSQ1STARTSTOPRESET
             aoi: 920, 457, 88, 130
+        MSQ1ANIMATIONCONTROLS:
+            aoi: 490, 646, 415, 78
         MSQ1RSIDE:
             # log: MSQ1RSIDE
             aoi: 1047, 311, 421, 572
@@ -222,7 +214,7 @@ items: &assessmentItems
             # Q3 can give you a warning when you try to add a 3rd point in the graphing tool
             # (this may happen in other items with the graphing tool, too)
             # need to track this; because the warning is movable. 
-            track: MSq3_warning.png
+            match: MSq3_warning.png
             log: MSq3_warning Activated
             # this will generate an AOI.
         MSQ3LSIDE:
@@ -240,7 +232,7 @@ items: &assessmentItems
         MSQ3DIRECTIONS:
             # log: MSQ3DIRECTIONS
             aoi: 822, 317, 650, 62
-        MSQ3TABLE:
+        MSQ3GRAPH:
             # log: MSQ3TABLE
             aoi: 874, 385, 522, 457
         MSQ3LINEBOX:
@@ -348,7 +340,7 @@ items: &assessmentItems
         MSQ6MSIMAGE:
             # log: MSQ6MSIMAGE
             aoi: 1081, 331, 226, 128
-        MSQ6QUESTION A:
+        MSQ6QUESTIONA:
             # log: MSQ6QUESTION A
             aoi: 943, 469, 503, 71
         MSQ6RESPONSEA:
@@ -364,7 +356,7 @@ items: &assessmentItems
 
     MSQ7:
         match: MSQ7.png
-        sourceLoc: 571, 352, 158, 125
+        sourceLoc: 482, 285, 164, 196
         # log: MSQ7
         MSQ7LSIDE:
             # log: MSQ7LSIDE
@@ -390,13 +382,22 @@ items: &assessmentItems
         match: MSQ8.png
         sourceLoc: 932, 454, 206, 149
         # log: MSQ8
+        # 
+        # we can potentially put a track here for the Ann character
+        # we will need to turn off skimming of video
+        # something like: 
+        # skimming: false
+        # AnimatedChar:
+        #   track: ann.png 0.3
+        # or potentially using color tracking
+        # but will need to turn it on after this item
         MSQ8TOP:
             # log: MSQ8TOP
             aoi: 448, 312, 1022, 170
-        MSQ8DIRECTIONS A:
+        MSQ8DIRECTIONSA:
             # log: MSQ8DIRECTIONS A
             aoi: 448, 317, 1022, 41
-        MSQ8UNPLAYED ANIMATION:
+        MSQ8UNPLAYEDANIMATION:
             # log: MSQ8UNPLAYED ANIMATION
             aoi: 482, 358, 955, 111
         MSQ8ANIMATION:
@@ -492,7 +493,7 @@ items: &assessmentItems
         MSQ10ANNWALKINGGRAPH:
             # log: MSQ10ANNWALKINGGRAPH
             aoi: 705, 382, 263, 249
-        MSQ10ANN RIDING GRAPH:
+        MSQ10ANNRIDINGGRAPH:
             # log: MSQ10ANN RIDING GRAPH
             aoi: 465, 532, 243, 329
         MSQ10COMBINEBUTTON:
@@ -543,17 +544,27 @@ items: &assessmentItems
         MSQ10Q&RB:
             # log: MSQ10Q&RB
             aoi: 978, 733, 475, 118
+    MSEND:
+        match: MSEND.png
+        sourceLoc: 449, 379, 156, 210
+        # log: MSINTRO
 
 
 tasks:
     Simulation:
-        track: simusig.png, 0.02
+        match: simusig.png, 0.02
         #threshold: 0.01
         relativeAOI: 0, 0, 785, 573
         log: SimulationToolActivated
+        SIMULATIONSTAGE:
+            relativeAOI: 46, 111, 552, 312
+        SIMULATIONCONTROLS:
+            relativeAOI: 46, 422, 552, 123
+        SIMULATIONBUTTONS:
+            relativeAOI: 616, 166, 122, 186
         break: true
     Calculator:
-        track: calcsig3.png, 0.02
+        match: calcsig3.png, 0.02
         #threshold: 0.01
         relativeAOI: 0, 0, 232, 289
         log: CalculatorToolActivated
@@ -572,4 +583,11 @@ tasks:
         unmatchLog: Assessment signature not found
         # log: taskName='assessment'
         # ocr: 617, 281 ,49, 16
+        # the CBAL standard tool bars
+        TOOLBARLEFT:
+            aoi: 450, 245, 308, 67
+        TOOLBARMID:
+            aoi: 757, 245, 383, 67
+        TOOLBARRIGHT:
+            aoi: 1140, 245, 331, 67
         items: *assessmentItems

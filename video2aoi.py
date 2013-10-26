@@ -31,7 +31,28 @@ def updateAOI (data):
         return
         
     aoilist.append(data)
-        
+
+def findLastMatchOffset():
+    ''' This function looks into the aoilist for the last aoi with id="__MATCH__".
+    If not found, it returns None. If found, it returns the coordinate of the upper left corner
+    '''
+    global aoilist
+
+    offset=[-9999, -9999]
+    contextLen = 0
+
+    for d in aoilist:
+        # look for the match with the longest context, which is the "deepest" match
+        if d[1] == "__MATCH__" and len(d[0]) > contextLen:
+            offset[0] = d[3]
+            offset[1] = d[4]
+            contextLen = len(d[0])
+    # now done with searching, return None if nothing is found
+    if offset[0] == -9999: return None
+    # otherwise return the real deal
+    return offset
+
+
 # funcs to process the YAML config file
 signatureImageDict={}
 def p2ReadSignatureImage(k, value, c):
@@ -158,17 +179,17 @@ def p2Task(k, value, context):
         # extract the signature if sourceLoc is specified
         # this means that (a) fname is the src and (b) match will be attempted at this perceise location
         img=np.copy(frame)
-        coord=[]
+        srccoord=[0,0,0,0]
         if "sourceLoc" in value:
             # something like: sourceLoc: 836, 294, 256, 140
-            coord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
+            srccoord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
             if "aoiFormat" in yamlconfig["study"]:
                 if yamlconfig["study"]["aoiFormat"] == "xywh":
                     # the x,y,w,h format: convert to xyxy format
-                    coord[2]=coord[2]+coord[0]+1
-                    coord[3]=coord[3]+coord[1]+1
+                    srccoord[2]=srccoord[2]+srccoord[0]+1
+                    srccoord[3]=srccoord[3]+srccoord[1]+1
             # now get the sig from the source image
-            img= frame[coord[1]:coord[3], coord[0]:coord[2]]
+            img= frame[srccoord[1]:srccoord[3], srccoord[0]:srccoord[2]]
 
         # now let's find the template
         if threshold == -99:
@@ -185,36 +206,56 @@ def p2Task(k, value, context):
                 # need to log this event
                 logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
             return None
-            """
-            # @@ unreachable code: not going to double check using slow mapping
-            # if sourceLoc is specified, let's now search the whole image
-            if "sourceLoc" in value:
-                sig=np.copy(signatureImageDict[fname])
-                # now let's find the template
-                if threshold == -99:
-                    # use the global default threshold
-                    res = frameEngine.findMatch(frame, sig)
-                else:
-                    # a new threshold is specified in the YAML file
-                    res = frameEngine.findMatch(frame, sig, threshold)
-            if res is None:
-                # if it's still None, or if it's still None,
-                # no match found; stop processing child nodes
-                logging.debug("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
-                return None
-            """
-        # if match fails, move to the next match; only proceed if Match succeeded
-
-        # found match, whether it's the sourceLoc or the original image; 
+        # only proceed if Match succeeded
         taskSigLoc, minVal=res
-        logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
-        # @@ temporarily adding boxes for matching signatures. 
+        objoffset = [taskSigLoc[0] + srccoord[0], taskSigLoc[1] + srccoord[1]]
+
+#         # if relativeAOI is specified, adjust the coords fo the AOI relative to taskSigLoc
+#         coord=[0,0,0,0]
+#         if "relativeAOI" in value:
+#             # something like: sourceLoc: 836, 294, 256, 140
+#             #logging.debug("TRACK: relativeAOI = "+str(value["relativeAOI"]))
+#             coord = map(int, value["relativeAOI"].split(","))   # by default, in order x1, y1, x2, y2
+#             #logging.debug("TRACK: parsed relativeAOI = "+str(len(coord)))
+
+#             if "aoiFormat" in yamlconfig["study"]:
+#                 if yamlconfig["study"]["aoiFormat"] == "xywh":
+#                     # the x,y,w,h format: convert to xyxy format
+#                     coord[2]=coord[2]+coord[0]
+#                     coord[3]=coord[3]+coord[1]
+#             coord[0]=coord[0]+ objoffset[0]
+#             coord[1]=coord[1]+ objoffset[1]
+#             coord[2]=coord[2]+ objoffset[0]
+#             coord[3]=coord[3]+ objoffset[1]
+#         else:
+#             h, w, clr= sig.shape
+#             coord[0]= objoffset[0]
+#             coord[1]= objoffset[1]
+#             coord[2]= w+ objoffset[0]
+#             coord[3]= h+ objoffset[1]
+
+# @ the __MATCH__ aoi should be the real offset and size
+# @ we then use aoilist as a stack to find the last __MATCH__ (i.e., with longest context)
+        coord=[0,0,0,0]
         h, w, clr= sig.shape
-        #@@ need to use coord()
-        if "sourceLoc" in value:
-            updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
-        else:
-            updateAOI((str(fname), "__MATCH__", str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
+        coord[0]= objoffset[0]
+        coord[1]= objoffset[1]
+        coord[2]= w+ objoffset[0]
+        coord[3]= h+ objoffset[1]
+
+        logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
+        updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
+
+        # # found match, whether it's the sourceLoc or the original image; 
+        # taskSigLoc, minVal=res
+        # logging.debug("MATCH: Signature="+str(fname)+"\tLocation="+str(taskSigLoc)+"\tminVal="+str(minVal)+txt)
+        # # @@ temporarily adding boxes for matching signatures. 
+        # h, w, clr= sig.shape
+        # #@@ need to use coord()
+        # if "sourceLoc" in value:
+        #     updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
+        # else:
+        #     updateAOI((str(fname), "__MATCH__", str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
 
             
     # track is like match in using templatematching, but it adds the object to the aoilist        
@@ -291,7 +332,7 @@ def p2Task(k, value, context):
 
             updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
 
-            
+
     # if successful match or NO match needed
     if "log" in value: 
         # simply log the message
@@ -305,11 +346,33 @@ def p2Task(k, value, context):
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
-        #logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
-
-        # exporting the "nice version" of AOI        
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        
+        updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+
+    if "relativeAOI" in value:
+        # something like: relativeAOI: 0, 0, 785, 573
+        # 
+        # first, find the latest __MATCH__ in the aoilist, and return the offset
+        objoffset = findLastMatchOffset()
+        if objoffset is None:
+            # error, most likely because there is no __MATCH__ in aoilist
+            logging.error("relativeAOI: Cannot find the last matched object. No AOI output")
+            return None
+
+        # read in the relative para
+        coord = map(int, value["relativeAOI"].split(","))   # by default, in order x1, y1, x2, y2
+        if "aoiFormat" in yamlconfig["study"]:
+            if yamlconfig["study"]["aoiFormat"] == "xywh":
+                # the x,y,w,h format: convert to xyxy format
+                coord[2]=coord[2]+coord[0]
+                coord[3]=coord[3]+coord[1]
+        coord[0]=coord[0]+ objoffset[0]
+        coord[1]=coord[1]+ objoffset[1]
+        coord[2]=coord[2]+ objoffset[0]
+        coord[3]=coord[3]+ objoffset[1]
+        # output
+        pageTitle = "/".join(context)
+        logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
     if "ocr" in value: 
