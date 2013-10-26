@@ -391,6 +391,10 @@ items: &assessmentItems
         #   track: ann.png 0.3
         # or potentially using color tracking
         # but will need to turn it on after this item
+                # where to search
+        # can limit the range
+        #   destRange: x, y, w, h
+
         MSQ8TOP:
             # log: MSQ8TOP
             aoi: 448, 312, 1022, 170
@@ -554,6 +558,8 @@ tasks:
     Simulation:
         match: simusig.png, 0.02
         #threshold: 0.01
+        # where to search
+        destRange: 0, 0, 1920, 1080
         relativeAOI: 0, 0, 785, 573
         log: SimulationToolActivated
         SIMULATIONSTAGE:
