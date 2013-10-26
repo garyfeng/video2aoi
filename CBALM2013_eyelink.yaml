@@ -117,7 +117,7 @@ items: &assessmentItems
             aoi: 590, 344, 501, 283
         MSINTROINTROTEXT:
             # log: MSINTROINTROTEXT
-            aoi: 739, 300, 202, 27
+            aoi: 368, 652, 895, 155
         break: true
 
     MSPRACTICE:
@@ -210,12 +210,12 @@ items: &assessmentItems
         match: MSQ3.png
         sourceLoc: 857, 295, 166, 105
         # log: MSQ3
-        MSQ3WARNING:
-            # Q3 can give you a warning when you try to add a 3rd point in the graphing tool
-            # (this may happen in other items with the graphing tool, too)
-            # need to track this; because the warning is movable. 
-            match: MSq3_warning.png
-            log: MSq3_warning Activated
+        # MSQ3WARNING:
+        #     # Q3 can give you a warning when you try to add a 3rd point in the graphing tool
+        #     # (this may happen in other items with the graphing tool, too)
+        #     # need to track this; because the warning is movable. 
+        #     match: MSq3_warning.png
+        #     log: MSq3_warning Activated
             # this will generate an AOI.
         MSQ3LSIDE:
             # log: MSQ3LSIDE
@@ -559,29 +559,37 @@ tasks:
         match: simusig.png, 0.02
         #threshold: 0.01
         # where to search
-        destRange: 0, 0, 1920, 1080
-        relativeAOI: 0, 0, 785, 573
+        destRange: 0, 0, 1680, 1050
+        relativeAOI: 0, 0, 778, 543
         log: SimulationToolActivated
         SIMULATIONSTAGE:
-            relativeAOI: 46, 111, 552, 312
+            relativeAOI: 43, 93, 552, 312
         SIMULATIONCONTROLS:
-            relativeAOI: 46, 422, 552, 123
+            relativeAOI: 43, 404, 552, 123
         SIMULATIONBUTTONS:
-            relativeAOI: 616, 166, 122, 186
+            relativeAOI: 616, 151, 122, 180
         break: true
     Calculator:
         match: calcsig3.png, 0.02
         #threshold: 0.01
-        relativeAOI: 			232	289
+        relativeAOI: 0, 0, 259, 265
         log: CalculatorToolActivated
-    MSQ5WARNING:
+    NEXTITEMWARNING:
         # the warning sign that says you can't go back if you move on to the next item
         # fortunately MSQ5 still matches even when it's grayed out a little bit, so we can put this here
         # and also this one doesn't move
-        match: MSQ5_warning.png
-        sourceLoc: 390, 307, 839, 146
-        aoi: 390, 307, 902, 146
+        match: NextItem_warning.png
+        sourceLoc: 419, 490, 850, 128
+        aoi: 419, 490, 850, 128
 
+    IECRASHWARNING:
+        # the warning sign that says you can't go back if you move on to the next item
+        # fortunately MSQ5 still matches even when it's grayed out a little bit, so we can put this here
+        # and also this one doesn't move
+        match: IECrash.png
+        sourceLoc: 631, 391, 418, 267
+        aoi: 631, 391, 418, 267
+        log: IECrashed
     Assessment:
         #match: CBALM_sig.png, 0.01
         match: CBALM.png
