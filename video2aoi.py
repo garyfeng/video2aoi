@@ -106,6 +106,12 @@ def p2ReadSignatureImage(k, value, c):
     except:
         logging.error("p2ReadSignatureImage: error reading image file="+str(fname))
         return True
+
+    if img is None:
+        logging.error("p2ReadSignatureImage: error reading image file="+str(fname))
+        print "p2ReadSignatureImage: error reading image file="+str(fname)
+        exit(0)
+       
     # extract the signature if sourceLoc is specified
     # this means that (a) fname is the src and (b) match will be attempted at this perceise location
     coord=[]
