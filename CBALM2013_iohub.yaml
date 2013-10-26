@@ -117,7 +117,7 @@ items: &assessmentItems
             aoi: 710, 384, 501, 283
         MSINTROINTROTEXT:
             # log: MSINTROINTROTEXT
-            aoi: 859, 340, 202, 27
+            aoi: 511, 679, 895, 155
         break: true
 
     MSPRACTICE:
