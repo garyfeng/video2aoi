@@ -200,7 +200,13 @@ def p2Task(k, value, context):
         # now get the range of search in the destination
         # if not specified, we cut the img from sourceLoc (add 1 px in each deminsion so the alg works)
         # otherwise we cut the img out of frame based on destRange.
-        destcoord = srccoord
+        if "sourceLoc" in value:
+            destcoord = srccoord
+        else:
+            # no sourceLoc specified, we use the whole frame; 
+            # note the shape() func returns [h,w,#color] as in numpy
+            destcoord = [0,0, frame.shape[1], frame.shape[0]]
+
         if not "destRange" in value:
             destcoord[2]=destcoord[2]+1
             destcoord[3]=destcoord[3]+1
