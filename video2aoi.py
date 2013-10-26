@@ -192,10 +192,29 @@ def p2Task(k, value, context):
             if "aoiFormat" in yamlconfig["study"]:
                 if yamlconfig["study"]["aoiFormat"] == "xywh":
                     # the x,y,w,h format: convert to xyxy format
-                    srccoord[2]=srccoord[2]+srccoord[0]+1
-                    srccoord[3]=srccoord[3]+srccoord[1]+1
+                    srccoord[2]=srccoord[2]+srccoord[0]
+                    srccoord[3]=srccoord[3]+srccoord[1]
             # now get the sig from the source image
-            img= frame[srccoord[1]:srccoord[3], srccoord[0]:srccoord[2]]
+            #img= frame[srccoord[1]:srccoord[3], srccoord[0]:srccoord[2]]
+
+        # now get the range of search in the destination
+        # if not specified, we cut the img from sourceLoc (add 1 px in each deminsion so the alg works)
+        # otherwise we cut the img out of frame based on destRange.
+        destcoord = srccoord
+        if not "destRange" in value:
+            destcoord[2]=destcoord[2]+1
+            destcoord[3]=destcoord[3]+1
+        else:
+            # destRange is in the value
+            destcoord = map(int, value["destRange"].split(","))   # by default, in order x1, y1, x2, y2
+            if "aoiFormat" in yamlconfig["study"]:
+                if yamlconfig["study"]["aoiFormat"] == "xywh":
+                    # the x,y,w,h format: convert to xyxy format
+                    destcoord[2]=destcoord[2]+destcoord[0]
+                    destcoord[3]=destcoord[3]+destcoord[1]
+
+        # we now have the dest range; now use this to cut the image
+        img= frame[destcoord[1]:destcoord[3], destcoord[0]:destcoord[2]]
 
         # now let's find the template
         if threshold == -99:
@@ -214,34 +233,8 @@ def p2Task(k, value, context):
             return None
         # only proceed if Match succeeded
         taskSigLoc, minVal=res
-        objoffset = [taskSigLoc[0] + srccoord[0], taskSigLoc[1] + srccoord[1]]
+        objoffset = [taskSigLoc[0] + destcoord[0], taskSigLoc[1] + destcoord[1]]
 
-#         # if relativeAOI is specified, adjust the coords fo the AOI relative to taskSigLoc
-#         coord=[0,0,0,0]
-#         if "relativeAOI" in value:
-#             # something like: sourceLoc: 836, 294, 256, 140
-#             #logging.debug("TRACK: relativeAOI = "+str(value["relativeAOI"]))
-#             coord = map(int, value["relativeAOI"].split(","))   # by default, in order x1, y1, x2, y2
-#             #logging.debug("TRACK: parsed relativeAOI = "+str(len(coord)))
-
-#             if "aoiFormat" in yamlconfig["study"]:
-#                 if yamlconfig["study"]["aoiFormat"] == "xywh":
-#                     # the x,y,w,h format: convert to xyxy format
-#                     coord[2]=coord[2]+coord[0]
-#                     coord[3]=coord[3]+coord[1]
-#             coord[0]=coord[0]+ objoffset[0]
-#             coord[1]=coord[1]+ objoffset[1]
-#             coord[2]=coord[2]+ objoffset[0]
-#             coord[3]=coord[3]+ objoffset[1]
-#         else:
-#             h, w, clr= sig.shape
-#             coord[0]= objoffset[0]
-#             coord[1]= objoffset[1]
-#             coord[2]= w+ objoffset[0]
-#             coord[3]= h+ objoffset[1]
-
-# @ the __MATCH__ aoi should be the real offset and size
-# @ we then use aoilist as a stack to find the last __MATCH__ (i.e., with longest context)
         coord=[0,0,0,0]
         h, w, clr= sig.shape
         coord[0]= objoffset[0]
@@ -262,81 +255,6 @@ def p2Task(k, value, context):
         #     updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
         # else:
         #     updateAOI((str(fname), "__MATCH__", str(k), taskSigLoc[0], taskSigLoc[1], taskSigLoc[0]+w, taskSigLoc[1]+h))
-
-            
-    # track is like match in using templatematching, but it adds the object to the aoilist        
-    if "track" in value:
-        # first make sure v is in the signature image list
-        #fname = value["track"]
-        para=value["track"].split(",")
-        fname = para[0]
-        if not isinstance(fname, str): 
-            logging.error("TRACK: expecting a filename but got "+str(fname))
-            return True
-        # if image path name is specified, can be absolute or relative
-        if "imgFilePath" in yamlconfig["study"].keys():
-            fname = os.path.join(yamlconfig["study"]["imgFilePath"], fname)
-        if not (fname in signatureImageDict):
-            logging.error("TRACK: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
-            return True
-        # optional threshold parameter
-        threshold = -99        
-        if len(para)==2:
-            try:
-                threshold = float(value["track"].split(",")[1])
-            except:
-                logging.error("TRACK: expecting a float number but got "+str(value["track"].split(",")[1]))
-                return True
-
-        # now let's find the template
-        if threshold == -99:
-            # use the global default threshold
-            res = frameEngine.findMatch(frame, signatureImageDict[fname])
-        else:
-            # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(frame, signatureImageDict[fname], threshold)
-            
-        if res is None:
-            # no match found; stop processing child nodes
-            logging.debug("TRACK:\tcontext="+str(context)+" fname="+str(fname)+" is not found in the current frame")
-            return None
-        # if match fails, move to the next match; only proceed if Match succeeded
-        else:
-            # found match, break; print "==== Match! ==" + fname
-            taskSigLoc, minVal=res
-
-            # if relativeAOI is specified, adjust the coords fo the AOI relative to taskSigLoc
-            coord=[0,0,0,0]
-            if "relativeAOI" in value:
-                # something like: sourceLoc: 836, 294, 256, 140
-                #logging.debug("TRACK: relativeAOI = "+str(value["relativeAOI"]))
-                coord = map(int, value["relativeAOI"].split(","))   # by default, in order x1, y1, x2, y2
-                #logging.debug("TRACK: parsed relativeAOI = "+str(len(coord)))
-
-                if "aoiFormat" in yamlconfig["study"]:
-                    if yamlconfig["study"]["aoiFormat"] == "xywh":
-                        # the x,y,w,h format: convert to xyxy format
-                        coord[2]=coord[2]+coord[0]
-                        coord[3]=coord[3]+coord[1]
-                coord[0]=coord[0]+ taskSigLoc[0]
-                coord[1]=coord[1]+ taskSigLoc[1]
-                coord[2]=coord[2]+ taskSigLoc[0]
-                coord[3]=coord[3]+ taskSigLoc[1]
-            else:
-                h, w, clr= signatureImageDict[fname].shape
-                coord[0]= taskSigLoc[0]
-                coord[1]= taskSigLoc[1]
-                coord[2]= w+ taskSigLoc[0]
-                coord[3]= h+ taskSigLoc[1]
-
-
-            logging.debug("TRACK:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(taskSigLoc)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-            pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
-            #logging.info("AOI\t"+txt+"\tpageTitle='"+pageTitle+"'\tid='"+str(k)+"'\tbox="+str(coord)+"\tcontent='"+str(k)+"'")
-            # exporting the "nice version" of AOI
-            logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-
-            updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
 
 
     # if successful match or NO match needed
