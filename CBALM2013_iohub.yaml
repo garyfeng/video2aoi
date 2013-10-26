@@ -574,11 +574,11 @@ tasks:
         #threshold: 0.01
         relativeAOI: 0, 0, 232, 289
         log: CalculatorToolActivated
-    MSQ5WARNING:
+    NEXTITEMWARNING:
         # the warning sign that says you can't go back if you move on to the next item
         # fortunately MSQ5 still matches even when it's grayed out a little bit, so we can put this here
         # and also this one doesn't move
-        match: MSQ5_warning.png
+        match: NextItem_warning.png
         sourceLoc: 510, 347, 839, 146
         aoi: 510, 347, 902, 146
 
