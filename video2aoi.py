@@ -707,21 +707,21 @@ def processVideo(v):
                 cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
                 # display rect for aoilist elements
                 if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
-                    if aoilist is not None:
-                        for d in aoilist:
-                            if "__MATCH__" in d["id"]:
-                                # matching or tracking images
-                                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
-                            else:
-                                # actual AOIs
-                                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
+                    # if aoilist is not None:
+                    for d in aoilist:
+                        if "__MATCH__" in d["id"]:
+                            # matching or tracking images
+                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
+                        else:
+                            # actual AOIs
+                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
                             
                 # shows the gaze circle
                 if not np.isnan(gazex+gazey): 
                     cv2.circle(frame, (int(gazex), int(gazey)), 10, (0,0,255), -1)
                 
                 # displays the AOI of the last matched object
-                if not (aoilist is None) and len(dump)>0: 
+                if len(aoilist)>0 and len(dump)>0: 
                     for d in dump:
                         if not ("__MATCH__" in d["id"]):
                             # actual active AOIs
