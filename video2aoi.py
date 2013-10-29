@@ -147,6 +147,12 @@ def p2Task(k, value, context):
         None if no-match, ==> stop processing any subnodes
         True if we want to continue processing the rest of the sibling elements ; 
         False to stop processing sibling elements
+
+        Note how it works: It only processes "dict" types -- i.e., AOI definition entries. 
+        It won't process any other types of YAML entries. 
+        With an dict entry, it looks INSIDE the entry to see process subnodes explicitly.   
+        If the subnode is a dict type, it gets processed iteratively.  But things like "AOI"
+        or "OCR" won't get processed unless it's under a dict entry.  
     '''
 
     global signatureImageDict, frame, txt, yamlconfig, skimmingMode
@@ -339,15 +345,14 @@ def p2Task(k, value, context):
         fname = fname.replace("\t","_").replace("=","_").replace(".avi","")
         fname = str(k)+fname+".png"
         fname = fname.replace("\t","").replace("'","").replace("video_","")
-        print fname
+        #print fname
         try:
             cv2.imwrite(fname, frame)
         except:
             logging.error("Error writing the current frame as a screenshot to file ="+str(fname))
         logging.info(txt+"\tScreenshot f='"+fname+"'"+txt)
     # Dealing with special commands: break, to not continue processing the rest of the list
-    # if "break" in value:
-    if "break" in k:
+    if "break" in value:
         # skip the rest of the tests in the same level
         #if  value["break"]:
         #    logging.info("Breaking...")
