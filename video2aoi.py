@@ -486,7 +486,8 @@ def processVideo(v):
             
         gaze = gaze.view(np.recarray)    # now you can refer to gaze.x[100]
         
-        mouse= gaze[np.where(gaze.event=="mouseClick")]
+        #mouse= gaze[np.where(gaze.event=="mouseClick")]
+        mouse= gaze[np.where(gaze.event=="mouseMove")]
         print "mouse data len = "+str(len(mouse))
         gaze = gaze[np.where(gaze.event=="gaze")]
         print "gaze data len = "+str(len(gaze))
@@ -505,7 +506,8 @@ def processVideo(v):
     # set the flag for skimmingMode
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
     aoilist=[]; dump=[]; lastCounter=0; lastVTime=0;
-    
+    mousex=-99; mousey=-99; mousetime =0
+
     # set colorplane choices
     colorPlane = -99; #use all colors
     if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:
@@ -549,7 +551,8 @@ def processVideo(v):
             # here you don't want to clear the frameEngine.lastFrame, because you want to detect the first change.
 
         # skimming mode: skipping frames at a time
-        if skimmingMode and frameNum % skimFrames >0 : continue
+        if skimFrames>0:
+            if skimmingMode and frameNum % skimFrames >0 : continue
         
         # read the frame
         flag, frame = video.retrieve()
@@ -576,7 +579,9 @@ def processVideo(v):
             ##############################
             # mouse click logging
             ##############################
-            if (mouse is not None and len(mouse)>1):
+            # let's make them persistent
+            #mousex=-99; mousey=-99; mousetime =0
+            if (mouse is not None) and len(mouse)>1:
                 temp = mouse[np.where(mouse.t<=vTime+toffset)]   
                 temp = temp[np.where(temp.t>lastGazetime)]   
                 #print "mouse = "+str(len(temp))
@@ -584,11 +589,11 @@ def processVideo(v):
                 if len(temp)>0:
                     for i in temp:
                         # found at least 1 match
-                        gazetime= i["t"]
-                        gazex=int(i["x"])
-                        gazey=int(i["y"])
+                        mousetime= i["t"]
+                        mousex=int(i["x"])
+                        mousey=int(i["y"])
                         if (not lastGazetime ==gazetime):
-                            logging.info("MouseClick: vt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey))
+                            logging.info("MouseMove: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey))
                         lastGazetime=gazetime
 
             ################################################
@@ -713,23 +718,26 @@ def processVideo(v):
                             
                 # shows the gaze circle
                 if not np.isnan(gazex+gazey): 
-                    cv2.circle(frame, (int(gazex), int(gazey)), 20, text_color)
+                    cv2.circle(frame, (int(gazex), int(gazey)), 10, (0,0,255), -1)
                 
                 # displays the AOI of the last matched object
-                if not aoilist is  None and len(dump)>0: 
+                if not (aoilist is None) and len(dump)>0: 
                     for d in dump:
-                        if not "__MATCH__" in d["id"]:
+                        if not ("__MATCH__" in d["id"]):
                             # actual active AOIs
                             cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
 
                     #cv2.rectangle(frame, (dump.x1[-1], dump.y1[-1]), (dump.x2[-1], dump.y2[-1]), text_color,2)
                 # now show mouse, last pos; used to estimate toffset
                 #curmouse = mouse[np.where(mouse.t<=vTime+ toffset)]
-                curmouse = None
-                if gaze is not None: 
-                    curmouse = gaze[np.where(gaze.t<=vTime+ toffset)]
-                    if curmouse is not None and len(curmouse)>0: 
-                        cv2.circle(frame, (int(curmouse.x[-1]), int(curmouse.y[-1])), 10, (0,0,255), -1)
+                # curmouse = None
+                # if mouse is not None: 
+                #     #curmouse = gaze[np.where(gaze.t<=vTime+ toffset)]
+                #     curmouse = mouse[np.where(gaze.t<=vTime+ toffset)]
+                #     if curmouse is not None and len(curmouse)>0: 
+                #         cv2.circle(frame, (int(curmouse.x[-1]), int(curmouse.y[-1])), 10, (0,0,255), -1)
+                if not np.isnan(mousex+mousey):
+                    cv2.circle(frame, (int(mousex), int(mousey)), 20, (0,0,255), 2)
                     
                 cv2.imshow(windowName, frame)       # main window with video control
                 #if txtScrollImage is not None: cv2.imshow("txtScrollImage", txtScrollImage)
