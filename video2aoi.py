@@ -478,8 +478,8 @@ def processVideo(v):
             res = subprocess.call(call, shell=False, stdout=f)
             f.close()
             if res != 0:
-                print("Error calling eyelog2dat.awk!")
-                logging.error("Error calling eyelog2dat.awk!")
+                print("Error calling "+awkfile)
+                logging.error("Error calling " +awkfile)
                 # sys.exit(1)
         # read gaze
         try:
