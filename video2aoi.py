@@ -506,7 +506,8 @@ def processVideo(v):
     
     # now let's skip the video to the first gaze time. 
     if gaze is not None:
-        startFrame = int(gaze[0].t * fps /1000) -fps    # less a second 
+        # translate from gaze time to vTime
+        startFrame = int((gaze[0].t - toffset) * fps /1000) -fps    # less a second 
         if startFrame<1: startFrame=1
 
     # init
