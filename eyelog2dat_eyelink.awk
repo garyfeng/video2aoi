@@ -98,7 +98,8 @@ function gettime(str)
         # already started, reset time, and output only time, x, y
         gsub(/[\(\) ]/, "", part[3])
         split(part[3], xy, ",")
-        print part[2]-start, "mouseClick", xy[1], xy[2],""
+        #print part[2]-start, "mouseClick", xy[1], xy[2],""
+        print laptime, "mouseClick", xy[1], xy[2],""
     } else {
         # do nothing
     }
