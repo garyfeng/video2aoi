@@ -103,7 +103,7 @@ items: &assessmentItems
         MSTITLECALCINSTRUCTION:
             # log: MSTITLECALCINSTRUCTION
             aoi: 495, 521, 691, 54
-        break: true
+        #break: true
 
     MSINTRO:
         match: MSINTRO.png
@@ -118,7 +118,7 @@ items: &assessmentItems
         MSINTROINTROTEXT:
             # log: MSINTROINTROTEXT
             aoi: 368, 652, 895, 155
-        break: true
+        #break: true
 
     MSPRACTICE:
         match: MSPRACTICE.png
@@ -145,7 +145,7 @@ items: &assessmentItems
         MSPRACTICECORRECTANS:
             # log: MSPRACTICECORRECTANS
             aoi: 1171, 740, 119, 55
-        break: true
+        #break: true
 
     MSQ1:
         match: MSQ1.png
@@ -174,7 +174,7 @@ items: &assessmentItems
         MSQ1RESPONSES:
             # log: MSQ1RESPONSES
             aoi: 928, 355, 404, 146
-        break: true
+        #break: true
 
     MSQ2:
         match: MSQ2.png
@@ -204,7 +204,7 @@ items: &assessmentItems
         MSQ2QSBRESPONSE:
             # log: MSQ2QSBRESPONSE
             aoi: 824, 494, 526, 36
-        break: true
+        #break: true
 
     MSQ3:
         match: MSQ3.png
@@ -244,7 +244,7 @@ items: &assessmentItems
         MSQ3STARTOVERBOX:
             # log: MSQ3STARTOVERBOX
             aoi: 1151, 761, 101, 32
-        break: true
+        #break: true
 
     MSQ4:
         match: MSQ4.png
@@ -292,7 +292,7 @@ items: &assessmentItems
         MSQ4QSDRESPONSE:
             # log: MSQ4QSDRESPONSE
             aoi: 775, 766, 559, 62
-        break: true
+        #break: true
 
     MSQ5:
         match: MSQ5.png
@@ -322,7 +322,7 @@ items: &assessmentItems
         MSQ5RESPONSE:
             # log: MSQ5RESPONSE
             aoi: 815, 621, 523, 80
-        break: true
+        #break: true
 
     MSQ6:
         match: MSQ6.png
@@ -352,7 +352,7 @@ items: &assessmentItems
         MSQ6RESPONSEB:
             # log: MSQ6RESPONSEB
             aoi: 823, 579, 503, 89
-        break: true
+        #break: true
 
     MSQ7:
         match: MSQ7.png
@@ -376,7 +376,7 @@ items: &assessmentItems
         MSQ7RESPONSE:
             # log: MSQ7RESPONSE
             aoi: 813, 529, 504, 152
-        break: true
+        #break: true
 
     MSQ8:
         match: MSQ8.png
@@ -437,7 +437,7 @@ items: &assessmentItems
         MSQ8RESPONSEC:
             # log: MSQ8RESPONSEC
             aoi: 818, 662, 200, 34
-        break: true
+        #break: true
 
     MSQ9:
         match: MSQ9.png
@@ -479,7 +479,7 @@ items: &assessmentItems
         MSQ9RESPONSEB:
             # log: MSQ9RESPONSEB
             aoi: 825, 709, 218, 36
-        break: true
+        #break: true
 
     MSQ10:
         match: MSQ10.png
@@ -568,7 +568,7 @@ tasks:
             relativeAOI: 43, 404, 552, 123
         SIMULATIONBUTTONS:
             relativeAOI: 616, 151, 122, 180
-        break: true
+        #break: true
     Calculator:
         match: calcsig3.png, 0.02
         #threshold: 0.01
