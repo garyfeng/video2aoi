@@ -52,7 +52,7 @@ study:
     # useGrayscaleImage: False
     # useColorChannel: R
     # videogazeoffset is how much the gaze is ahead of the video
-    videogazeoffset: 0  
+    videogazeoffset: -1300   
     # where image files are; can be relative path from the current directory
     imgFilePath: "CBALM_eyelink_sig"
     # we have 2 formats for entering AOI coordinates
