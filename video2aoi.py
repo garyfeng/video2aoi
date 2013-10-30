@@ -433,8 +433,6 @@ def processVideo(v):
         return
     taskbarName="Video"
     if showVideo: cv2.createTrackbar(taskbarName, windowName, int(startFrame/100), int(nFrames/100+1), onChange)
-    # moving to the startFrame
-    video.set(cv.CV_CAP_PROP_POS_FRAMES, startFrame)
 
     # log
     logging.info("video = "+str(v)+"\tScaling ratio =" +str(ratio) +"\tlog = '"+str(logfilename)+"'")
@@ -507,8 +505,12 @@ def processVideo(v):
     # now let's skip the video to the first gaze time. 
     if gaze is not None:
         # translate from gaze time to vTime
-        startFrame = int((gaze[0].t - toffset) * fps /1000) -fps    # less a second 
+        startFrame = int((gaze.t[0] - toffset) * fps /1000) -fps    # less a second 
         if startFrame<1: startFrame=1
+        print "startFrame ="+ str(startFrame)+" gaze.t[0]="+str(gaze.t[0]) + " toffset="+str(toffset) + " fps=" +str(fps)
+
+    # moving to the startFrame
+    video.set(cv.CV_CAP_PROP_POS_FRAMES, startFrame)
 
     # init
     essayID=None; lastEssayID="falseID"; #forcedCalc=False
