@@ -6,6 +6,7 @@
 *.sublime-workspace
 *.sublime-project
 *.txt
+*RData
 
 #################
 ## Eclipse
