@@ -214,8 +214,11 @@ def p2Task(k, value, context):
             destcoord = [0,0, frame.shape[1], frame.shape[0]]
 
         if not "destRange" in value:
-            destcoord[2]=destcoord[2]+1
-            destcoord[3]=destcoord[3]+1
+            # let's do +/- 2 pix on each side
+            destcoord[0]=destcoord[0]-2
+            destcoord[1]=destcoord[1]-2
+            destcoord[2]=destcoord[2]+2
+            destcoord[3]=destcoord[3]+2
         else:
             # destRange is in the value
             destcoord = map(int, value["destRange"].split(","))   # by default, in order x1, y1, x2, y2
@@ -224,6 +227,12 @@ def p2Task(k, value, context):
                     # the x,y,w,h format: convert to xyxy format
                     destcoord[2]=destcoord[2]+destcoord[0]
                     destcoord[3]=destcoord[3]+destcoord[1]
+
+        # make sure everything is within the frame
+        if destcoord[0]<0: destcoord[0]=0
+        if destcoord[1]<0: destcoord[1]=0
+        if destcoord[2]>frame.shape[1]: destcoord[2]=frame.shape[1]
+        if destcoord[3]>frame.shape[0]: destcoord[3]=frame.shape[0]
 
         # we now have the dest range; now use this to cut the image
         img= frame[destcoord[1]:destcoord[3], destcoord[0]:destcoord[2]]
@@ -501,8 +510,8 @@ def processVideo(v):
         print "Gaze read from "+datafilename +" with n="+str(len(gaze))
         # end reading eye event log
     
-    # now let's skip the video to the first gaze time. 
-    if gaze is not None:
+    # now let's skip the video to the first gaze time, but only if startFrame is not deberately set.
+    if startFrame <=1 and gaze is not None:
         # translate from gaze time to vTime
         startFrame = int((gaze.t[0] - toffset) * fps /1000) -fps    # less a second 
         if startFrame<1: startFrame=1
