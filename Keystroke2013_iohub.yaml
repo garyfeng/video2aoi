@@ -1,0 +1,202 @@
+# yaml for video2aoi.py
+# Gary Feng, 2013, Princeton, NJ
+
+# requires:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# aoi: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# break: specify this if you don't want to continue processing 
+#       the rest of **sibling** items 
+#       following the **successful** processing of the current entry
+#       doesn't matter if you specify True or False, so long as it appears
+
+# match: always followed by a image filename, followed by options:
+#       match: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#       sourceLoc: x, y, w, h, or x1, y1, x2, y2, depending on "aoiFormat" 
+#           this specifies the subimage that will be used as the signature. 
+#           and by default, match will first tries to do a image match at this location in the dest image
+#           if this fails, it will do an exhaustive template matching
+#       unmatchLog: string to log in the case of unmatch; use this carefully
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: Keystroke_2013
+    startFrame: 1
+    scalingRatio: 0.5
+    # did a look at the distribution of frameChange in cbalm49.avi, and looks like 
+    # a value of 1 will get ~20 more check points than =3 but will surely catch 
+    # most false negatives. 
+    frameChangeThreshold: 1
+    # this the global parameter that can be fine-tuned
+    matchTemplateThreshold: 0.02
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0.5 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: 0  
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "2013Keystroke_sig"
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: True
+    gazeProcessingScript: "eyelog2dat_iohub.awk"
+    logFileSuffix: "_eye.log"
+
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+
+    # Show AOIs on the video?
+    displayAOI: True
+
+    # log level debug: turn this on if you want to get a LOT of info in the log
+    # including frame by frame counts
+    logLevelDebug: False
+
+
+items: &assessmentItems
+    #Mouse:
+        #match: mouse1.png, 0.2
+        #threshold: 0.2
+        ## log: mouseFound
+
+    Task4AdFullScreen:
+        match: Task4AdFullScreen.png
+        sourceLoc: 687, 326, 274, 127
+        aoi: 462, 347, 1000, 530
+
+    Task4AdLeft:
+        match: Task4AdLeft.png
+        sourceLoc: 686, 310, 83, 160
+        aoi: 462, 347, 490, 530
+
+    Task4Checklist:
+        match: Task4Checklist.png
+        sourceLoc: 602, 289, 151, 158
+        aoi: 462, 347, 490, 530
+
+    Task4End:
+        match: Task4End.png
+        sourceLoc: 468, 311, 171, 155
+        aoi: 447, 310, 1024, 573
+
+    Task4EssayRight:
+        match: Task4EssayRight.png
+        sourceLoc: 965, 316, 117, 173
+        EssayDirections:
+            aoi: 972, 350, 468, 131
+        EssayInput:
+            aoi: 972, 481, 468, 395
+
+    Task4Feedback:
+        match: Task4Feedback.png
+        sourceLoc: 889, 401, 131, 91
+        aoi: 522, 347, 869, 145
+
+    Task4FeedbackSubmitted:
+        match: Task4FeedbackSubmitted.png
+        sourceLoc: 658, 446, 240, 80
+        aoi: 447, 310, 1024, 573
+
+    Task4Intro:
+        match: Task4Intro.png
+        sourceLoc: 816, 351, 290, 88
+        aoi: 447, 310, 1024, 573
+        IntroTitle:
+            aoi: 816, 351, 290, 88
+        IntroDirections:
+            aoi: 569, 502, 782, 224
+
+    Task4PlanOutlineFullScreen:
+        match: Task4PlanOutlineFullScreen.png
+        sourceLoc: 471, 325, 328, 122
+        aoi: 461, 347, 998, 492
+
+    Task4PlanPreviewFullScreen:
+        match: Task4PlanPreviewFullScreen.png
+        sourceLoc: 577, 311, 265, 210
+        aoi: 461, 347, 998, 492
+
+    Task4PlanPreviewLeft:
+        match: Task4PlanPreviewLeft.png
+        sourceLoc: 526, 316, 155, 235
+        aoi: 462, 347, 490, 530
+
+    Task4TryingFullScreen:
+        match: Task4TryingFullScreen.png
+        sourceLoc: 730, 315, 210, 185
+        aoi: 452, 347, 1013, 529
+
+    Task4TryingLeft:
+        match: Task4TryingLeft.png
+        sourceLoc: 683, 310, 142, 194
+        aoi: 462, 347, 490, 530
+
+    Task4WorriesFullScreen:
+        match: Task4WorriesFullScreen.png
+        sourceLoc: 575, 310, 127, 169
+        aoi: 452, 347, 1013, 529
+
+    Task4WorriesLeft:
+        match: Task4WorriesLeft.png
+        sourceLoc: 517, 359, 368, 90
+        aoi: 462, 347, 490, 530
+
+    TypingTestMainScreen:
+        match: TypingTestMainScreen.png
+        sourceLoc: 732, 288, 164, 273
+        TypingDirections:
+            aoi: 450, 116, 1003, 349
+        TypingSourceText:
+            aoi: 450, 465, 1003, 231
+        TypingInputArea:
+            aoi: 450, 696, 1003, 326
+
+    TypingTestResults:
+        match: TypingTestResults.png
+        sourceLoc: 460, 288, 245, 132
+        aoi: 449, 117, 1003, 908
+        TypingResults:
+            ocr: 462, 454, 219, 205
+
+tasks:
+
+    Assessment:
+        #match: CBALM_sig.png, 0.01
+        match: Task4WorriesFullScreen.png
+        sourceLoc: 834, 244, 250, 76
+        unmatchLog: Assessment signature not found
+        # log: taskName='assessment'
+        # ocr: 617, 281 ,49, 16
+        # the CBAL standard tool bars
+        TOOLBARLEFT:
+            aoi: 450, 245, 308, 67
+        TOOLBARMID:
+            aoi: 757, 245, 383, 67
+        TOOLBARRIGHT:
+            aoi: 1140, 245, 331, 67
+        items: *assessmentItems
