@@ -437,7 +437,6 @@ def processVideo(v):
     # log
     logging.info("video = "+str(v)+"\tScaling ratio =" +str(ratio) +"\tlog = '"+str(logfilename)+"'")
     logging.info("VideoFrameSize = "+str(video.get(cv.CV_CAP_PROP_FRAME_WIDTH ))+"\t"+str(video.get(cv.CV_CAP_PROP_FRAME_HEIGHT )))
-    logging.info("NumFrames = "+str(nFrames)+"\tStartFrame = "+str(startFrame)+ "\tFPS="+str(fps))
 
     # read signature image files for template matching
     p2YAML(yamlconfig["tasks"], p2ReadSignatureImage)
@@ -511,6 +510,7 @@ def processVideo(v):
 
     # moving to the startFrame
     video.set(cv.CV_CAP_PROP_POS_FRAMES, startFrame)
+    logging.info("NumFrames = "+str(nFrames)+"\tStartFrame = "+str(startFrame)+ "\tFPS="+str(fps))
 
     # init
     essayID=None; lastEssayID="falseID"; #forcedCalc=False
