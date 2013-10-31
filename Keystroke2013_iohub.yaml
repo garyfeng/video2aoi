@@ -34,6 +34,8 @@
 #       currently we do a template match. 
 #       @@ we should consider a feature-based or a color-histgram method, 
 #       which may be faster and allow for Bayesian decisions on best matches
+#       @@ Also note: every sig file must have a unique file name, because the fname
+#           is used as the key to the sig in memory; else later ones will overwrite earlier ones. 
 
 # study-wide parameters
 
@@ -52,7 +54,7 @@ study:
     # useGrayscaleImage: False
     # useColorChannel: R
     # videogazeoffset is how much the gaze is ahead of the video
-    videogazeoffset: 0  
+    videogazeoffset: 600  
     # where image files are; can be relative path from the current directory
     imgFilePath: "2013Keystroke_sig"
     # we have 2 formats for entering AOI coordinates
@@ -91,7 +93,10 @@ items: &assessmentItems
 
     Task4AdLeft:
         match: Task4AdLeft.png
-        sourceLoc: 686, 310, 83, 160
+        sourceLoc: 532, 363, 329, 103
+        # for some reason the left reading panel may shift position slightly. 
+        # so we do a search in +/- 20 pix
+        destRange: 522, 353, 349, 123
         aoi: 462, 347, 490, 530
 
     Task4Checklist:
@@ -106,16 +111,14 @@ items: &assessmentItems
 
     Task4EssayRight:
         match: Task4EssayRight.png
-        sourceLoc: 965, 316, 117, 173
+        # this sig can scroll up and down with the page!!
+        sourceLoc: 986, 369, 183, 107
+        # so we need this destRange to search vertically
+        destRange: 980, 349, 200, 147
         EssayDirections:
-            aoi: 972, 350, 468, 131
+            relativeAOI: 0, 0, 433, 111
         EssayInput:
-            aoi: 972, 481, 468, 395
-
-    Task4Feedback:
-        match: Task4Feedback.png
-        sourceLoc: 889, 401, 131, 91
-        aoi: 522, 347, 869, 145
+            relativeAOI: 0, 112, 433, 343
 
     Task4FeedbackSubmitted:
         match: Task4FeedbackSubmitted.png
@@ -133,7 +136,8 @@ items: &assessmentItems
 
     Task4PlanOutlineFullScreen:
         match: Task4PlanOutlineFullScreen.png
-        sourceLoc: 471, 325, 328, 122
+        sourceLoc: 462, 324, 385, 64
+        #destRange: 451, 315, 348, 142
         aoi: 461, 347, 998, 492
 
     Task4PlanPreviewFullScreen:
@@ -153,7 +157,8 @@ items: &assessmentItems
 
     Task4TryingLeft:
         match: Task4TryingLeft.png
-        sourceLoc: 683, 310, 142, 194
+        sourceLoc: 512, 367, 316, 134
+        destRange: 502, 357, 326, 154
         aoi: 462, 347, 490, 530
 
     Task4WorriesFullScreen:
@@ -163,9 +168,24 @@ items: &assessmentItems
 
     Task4WorriesLeft:
         match: Task4WorriesLeft.png
-        sourceLoc: 517, 359, 368, 90
+        sourceLoc: 790, 347, 160, 203
+        destRange: 780, 327, 200, 250
         aoi: 462, 347, 490, 530
 
+
+tasks:
+
+    # in this study the grayed CBAL sign won't get recognized
+    Task4Feedback:
+        match: Task4Feedback.png
+        # so we take the OK button
+        sourceLoc: 1253, 440, 86, 38
+        # and look for it in this narrow range
+        destRange: 1103, 428, 389, 65
+        # if found, we give it a generic AOI; the width may vary depending on the feedback. 
+        aoi: 522, 347, 869, 145
+
+    # the typing screens do not have the CBAL sign so we have deal with them here. 
     TypingTestMainScreen:
         match: TypingTestMainScreen.png
         sourceLoc: 732, 288, 164, 273
@@ -182,12 +202,10 @@ items: &assessmentItems
         aoi: 449, 117, 1003, 908
         TypingResults:
             ocr: 462, 454, 219, 205
-
-tasks:
-
+            aoi: 462, 454, 219, 205
     Assessment:
         #match: CBALM_sig.png, 0.01
-        match: Task4WorriesFullScreen.png
+        match: KeystrokeSig.png
         sourceLoc: 834, 244, 250, 76
         unmatchLog: Assessment signature not found
         # log: taskName='assessment'
