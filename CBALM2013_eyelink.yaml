@@ -551,7 +551,7 @@ items: &assessmentItems
     MSEND:
         match: MSEND.png
         sourceLoc: 329, 339, 156, 210
-        # log: MSINTRO
+        aoi: 329, 204, 1024, 640
 
 
 tasks:

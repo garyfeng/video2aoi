@@ -552,6 +552,7 @@ items: &assessmentItems
         match: MSEND.png
         sourceLoc: 449, 379, 156, 210
         # log: MSINTRO
+        aoi: 447, 246, 1024, 640
 
 
 tasks:
