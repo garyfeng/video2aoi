@@ -61,6 +61,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             with open(os.path.join(output_directory,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'w') as subject_log:
+                print "Now processing: {0}_eye.txt".format(subject_code_dict[session_id])
                 for row in group_iter:
                     print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-startTime),
                                                   "gaze",
