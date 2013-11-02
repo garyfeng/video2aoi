@@ -5,10 +5,14 @@ Extract gaze positions from HDF5 file for use with v2.py or create_subtitle.py
 @author: Dan Blanchard
 @contact: dblanchard@ets.org
 @date: April 2013
+
+Gary Feng, Nov 2013:
+- exporting keystroke and mouse data
 '''
 
 from __future__ import print_function, unicode_literals, with_statement
 
+#import numpy
 import argparse
 import os
 from itertools import izip, groupby
@@ -24,7 +28,6 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     '''
     # Read in tables
     h5file = tables.openFile(hdf5_filename)
-    table = h5file.root.data_collection.events.eyetracker.BinocularEyeSampleEvent
 
     # Build handy dictionaries
     code_subject_dict = dict([(row['code'], row['session_id']) for row in
@@ -35,30 +38,88 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                h5file.root.data_collection.experiment_meta_data])
 
     # Build filter string
-    filter_string = '(status == 0)'
+    filter_string = '(device_id == 0)'
     if subject is not None:
         filter_string += ' & (session_id == {0})'.format(code_subject_dict[subject])
     if experiment is not None:
         filter_string += ' & (experiment_id == {0})'.format(code_experiment_dict[experiment])
 
-    # Do query
+    # get the eyegaze table first
+    table = h5file.root.data_collection.events.eyetracker.BinocularEyeSampleEvent
+    # Do query, valid gaze only
+    valid_rows = sorted(table.readWhere(filter_string+' & (status==0)'), key=itemgetter('experiment_id',
+                                                                       'session_id',
+                                                                       'time'))
+    # init the startTime
+    startTime=0
+    # Proceed if we got anything
+    if valid_rows:
+    	startTime = int(round(valid_rows[0]['time']*1000))
+        # Print all valid gaze data for given eye
+        for session_id, group_iter in groupby(valid_rows,
+                                           key=itemgetter('session_id')):
+            with open(os.path.join(output_directory,
+                                   '{0}_eye.txt'.format(subject_code_dict[session_id])),
+                      'w') as subject_log:
+                for row in group_iter:
+                    print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                                                  "gaze",
+                                                  int(round(row['{0}_gaze_x'.format(eye)])),
+                                                  int(round(row['{0}_gaze_y'.format(eye)])),
+                                                  row["event_id"]),
+                          file=subject_log)
+            subject_log.close()
+
+    # get the keystroke table 
+    table = h5file.root.data_collection.events.keyboard.KeyboardCharEvent
+    # Do query, using the same filter
     valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
                                                                        'session_id',
                                                                        'time'))
-
     # Proceed if we got anything
     if valid_rows:
         # Print all valid gaze data for given eye
         for session_id, group_iter in groupby(valid_rows,
                                            key=itemgetter('session_id')):
             with open(os.path.join(output_directory,
-                                   '{0}_eye.log'.format(subject_code_dict[session_id])),
-                      'w') as subject_log:
+                                   '{0}_eye.txt'.format(subject_code_dict[session_id])),
+                      'a') as subject_log:
                 for row in group_iter:
-                    print('{0}\t{1}\t{2}'.format(row['{0}_gaze_x'.format(eye)],
-                                                 row['{0}_gaze_y'.format(eye)],
-                                                 row['time']),
+                    if round(row['time']*1000)>startTime:
+                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                                                  "keyboard",
+                                                  "",
+                                                  "",
+                                                  row['key']),
                           file=subject_log)
+            subject_log.close()
+
+    # get the mouse table 
+    table = h5file.root.data_collection.events.mouse.MouseInputEvent
+    # Do query
+    valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
+                                                                       'session_id',
+                                                                       'time'))
+    # Proceed if we got anything
+    if valid_rows:
+        # Print all valid gaze data for given eye
+        for session_id, group_iter in groupby(valid_rows,
+                                           key=itemgetter('session_id')):
+            with open(os.path.join(output_directory,
+                                   '{0}_eye.txt'.format(subject_code_dict[session_id])),
+                      'a') as subject_log:
+                for row in group_iter:
+                    if round(row['time']*1000)>startTime:
+                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                                                  "mouse",
+                                                  int(round(row["x_position"])),
+                                                  int(round(row["y_position"])),
+                                                  row['pressed_buttons']),
+                          file=subject_log)
+            subject_log.close()
+
+    # close HDF5 file
+    h5file.close()
 
 def main():
     ''' Main function that processes arguments and gets things started. '''
