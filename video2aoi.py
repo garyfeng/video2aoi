@@ -397,11 +397,16 @@ def p2YAML(d, func, context=[]):
 def processVideo(v):
     '''Process a video file, and log the events and AOIs to the log file.
     It uses the global settings from the yamlconfig object. 
+
+    @@ gaze etc don't have to be global variables.@@ 
     '''
     global yamlconfig, gaze, gazex, gazey, aoilist, toffset
     global video, frame, taskSigLoc, minVal, startFrame
     global txt, essayID, lastEssayID, vTime, jumpAhead, skimmingMode
     
+    # local vars
+    alldata=None
+
     # init vars
     try:
         startFrame= yamlconfig["study"]["startFrame"]
@@ -453,11 +458,12 @@ def processVideo(v):
     # read eye event logs, only if doNotProcessGazeLog=False or unspecified
     basename = os.path.basename(os.path.splitext(v)[0])
     processGazeLog = True
-    gaze=None; mouse=None;
+
+    gaze=None; mouse=None; keystroke=None;
 
     if "processGazeLog" in yamlconfig["study"].keys():
         processGazeLog= yamlconfig["study"]["processGazeLog"]
-    logging.info("processGazeLog = "+str(processGazeLog))
+    logging.info("processGazeLog: processGazeLog = "+str(processGazeLog))
     
     if processGazeLog:
         if "logFileSuffix" in yamlconfig["study"].keys():
@@ -465,13 +471,13 @@ def processVideo(v):
         else:
             datalogfilename = basename + "_eye.log"; #default
         datafilename = basename + "_events.txt"
-        print "datalogfilename="+datalogfilename
+        print "processGazeLog: datalogfilename="+datalogfilename
         # check to see if it's empty; if so, delete it
         if os.path.isfile(datafilename) and os.path.getsize(datafilename)==0:
-            print('Eyelog2Dat: %s file is empty. Deleted' % datafilename)
+            print('processGazeLog: Eyelog2Dat: %s file is empty. Deleted' % datafilename)
             os.remove(datafilename)
         if not os.access(datafilename, os.R_OK):
-            print('Eyelog2Dat: %s file is not present' % datafilename)
+            print('processGazeLog: Eyelog2Dat: %s file is not present' % datafilename)
             # now try to process and generate the file:
             if "gazeProcessingScript" in yamlconfig["study"].keys():
                 awkfile= yamlconfig["study"]["gazeProcessingScript"]
@@ -484,24 +490,29 @@ def processVideo(v):
             res = subprocess.call(call, shell=False, stdout=f)
             f.close()
             if res != 0:
-                print("Error calling "+awkfile)
-                logging.error("Error calling " +awkfile)
+                print("processGazeLog: Error calling "+awkfile)
+                logging.error("processGazeLog: Error calling " +awkfile)
                 # sys.exit(1)
-        # read gaze
+        # read all data
         try:
-            gaze = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
+            alldata = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
         except:
             # no gaze file to read; fake one
-            print "Error reading "+datafilename
-            gaze = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
+            print "processGazeLog: Error reading "+datafilename
+            logging.error("processGazeLog: file "+datafilename+" cannot be read.")
+            return 
+            #alldata = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
             
-        gaze = gaze.view(np.recarray)    # now you can refer to gaze.x[100]
+        alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
         
         #mouse= gaze[np.where(gaze.event=="mouseClick")]
-        mouse= gaze[np.where(gaze.event=="mouseMove")]
-        print "mouse data len = "+str(len(mouse))
-        gaze = gaze[np.where(gaze.event=="gaze")]
-        print "gaze data len = "+str(len(gaze))
+        keystroke= alldata[np.where(alldata.event=="keyboard")]
+        print "processGazeLog: keyboard data len = "+str(len(keystroke))
+        # get all mouse events, moves and clicks
+        mouse= alldata[np.where(np.logical_or( alldata.event=="mouseMove", alldata.event=="mouseClick"))]
+        print "processGazeLog: mouse data len = "+str(len(mouse))
+        gaze = alldata[np.where(alldata.event=="gaze")]
+        print "processGazeLog: gaze data len = "+str(len(gaze))
         
         #gaze = [row for row in reader(datafilename, delimiter='\t') if row[1] == 'gaze']
         if(gaze is not None and len(gaze) < 1):
@@ -615,8 +626,21 @@ def processVideo(v):
                         mousex=int(i["x"])
                         mousey=int(i["y"])
                         if (not lastGazetime ==gazetime):
-                            logging.info("MouseMove: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey))
+                            logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
                         lastGazetime=gazetime
+
+            ##############################
+            # Keystroke logging
+            ##############################
+            if (keystroke is not None) and len(keystroke)>1:
+                temp = mouse[np.where(keystroke.t<=vTime+toffset)]   
+                temp = temp[np.where(temp.t>lastGazetime)]   
+                #print "mouse = "+str(len(temp))
+            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
+                if len(temp)>0:
+                    for i in temp:
+                        logging.info("Keystroke: vt="+str(vTime)+"\tgzt="+str(i["t"])+"\tx="+""+"\ty="+""+"\tkey="+str(i["info"]))
+
 
             ################################################
             # now only process when there is a large change
