@@ -29,7 +29,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     # Read in tables
     try:
       h5file = tables.openFile(hdf5_filename)
-    else:
+    except:
       print ("Error, {} cannot be opened".format(hdf5_filename))
       return False
 
