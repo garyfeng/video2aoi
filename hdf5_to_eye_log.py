@@ -38,7 +38,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                h5file.root.data_collection.experiment_meta_data])
 
     # Build filter string
-    filter_string = '(device_id == 0)'
+    filter_string = '(experiment_id > 0)'
     if subject is not None:
         filter_string += ' & (session_id == {0})'.format(code_subject_dict[subject])
     if experiment is not None:
@@ -50,25 +50,39 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     valid_rows = sorted(table.readWhere(filter_string+' & (status==0)'), key=itemgetter('experiment_id',
                                                                        'session_id',
                                                                        'time'))
-    # init the startTime
-    startTime=0
+    # init the startTime; it has to be a dict
+    startTime={}
     # Proceed if we got anything
     if valid_rows:
-    	startTime = int(round(valid_rows[0]['time']*1000))
         # Print all valid gaze data for given eye
-        for session_id, group_iter in groupby(valid_rows,
-                                           key=itemgetter('session_id')):
+        for session_id, group_iter in groupby(valid_rows, key=itemgetter('session_id')):
             with open(os.path.join(output_directory,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'w') as subject_log:
-                print "Now processing: {0}_eye.txt".format(subject_code_dict[session_id])
+                firstGaze = True
+
                 for row in group_iter:
-                    print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                    if firstGaze:
+                      startTime['{0}_eye.txt'.format(subject_code_dict[session_id])] = int(round(row['time']*1000))
+                      st=startTime['{0}_eye.txt'.format(subject_code_dict[session_id])]
+                      print ('Now processing: {0}_eye.txt, startTime = {1}'.format(subject_code_dict[session_id], st))
+                      #print (str(startTime))
+                      firstGaze=False
+                      # output
+                      print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( 0,
                                                   "gaze",
                                                   int(round(row['{0}_gaze_x'.format(eye)])),
                                                   int(round(row['{0}_gaze_y'.format(eye)])),
                                                   row["event_id"]),
-                          file=subject_log)
+                                            file=subject_log)
+                    else:
+                      # not first gaze
+                      print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-st),
+                                                  "gaze",
+                                                  int(round(row['{0}_gaze_x'.format(eye)])),
+                                                  int(round(row['{0}_gaze_y'.format(eye)])),
+                                                  row["event_id"]),
+                                            file=subject_log)
             subject_log.close()
 
     # get the keystroke table 
@@ -85,14 +99,18 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             with open(os.path.join(output_directory,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'a') as subject_log:
+              try:
+                st=startTime['{0}_eye.txt'.format(subject_code_dict[session_id])]
                 for row in group_iter:
                     if round(row['time']*1000)>startTime:
-                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-st),
                                                   "keyboard",
                                                   "",
                                                   "",
                                                   row['key']),
                           file=subject_log)
+              except:
+                print ('Error: {0}_eye.txt does not exist; keyboard events cannot be saved'.format(subject_code_dict[session_id]))
             subject_log.close()
 
     # get the mouse table 
@@ -109,14 +127,18 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             with open(os.path.join(output_directory,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'a') as subject_log:
+              try:
+                st=startTime['{0}_eye.txt'.format(subject_code_dict[session_id])]
                 for row in group_iter:
                     if round(row['time']*1000)>startTime:
-                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-startTime),
+                        print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-st),
                                                   "mouse",
                                                   int(round(row["x_position"])),
                                                   int(round(row["y_position"])),
                                                   row['pressed_buttons']),
                           file=subject_log)
+              except:
+                print ('Error: {0}_eye.txt does not exist; mouse events cannot be saved'.format(subject_code_dict[session_id]))
             subject_log.close()
 
     # close HDF5 file
