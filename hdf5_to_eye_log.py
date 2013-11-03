@@ -27,7 +27,11 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     file or filters on subject and/or experiment if specified.
     '''
     # Read in tables
-    h5file = tables.openFile(hdf5_filename)
+    try:
+      h5file = tables.openFile(hdf5_filename)
+    else:
+      print ("Error, {} cannot be opened".format(hdf5_filename))
+      return False
 
     # Build handy dictionaries
     code_subject_dict = dict([(row['code'], row['session_id']) for row in
