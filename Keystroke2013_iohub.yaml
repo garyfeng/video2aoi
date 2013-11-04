@@ -54,7 +54,7 @@ study:
     # useGrayscaleImage: False
     # useColorChannel: R
     # videogazeoffset is how much the gaze is ahead of the video
-    videogazeoffset: 600  
+    videogazeoffset: -1500  
     # where image files are; can be relative path from the current directory
     imgFilePath: "2013Keystroke_sig"
     # we have 2 formats for entering AOI coordinates
