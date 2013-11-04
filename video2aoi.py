@@ -466,17 +466,23 @@ def processVideo(v):
     logging.info("processGazeLog: processGazeLog = "+str(processGazeLog))
     
     if processGazeLog:
-        if "logFileSuffix" in yamlconfig["study"].keys():
-            datalogfilename = basename + yamlconfig["study"]["logFileSuffix"]
+        # get the gaze/key/mouse data file name
+        if "dataFileSuffix" in yamlconfig["study"].keys():
+            datafilename = basename + yamlconfig["study"]["dataFileSuffix"]
         else:
-            datalogfilename = basename + "_eye.log"; #default
-        datafilename = basename + "_events.txt"
-        print "processGazeLog: datalogfilename="+datalogfilename
+            datafilename = basename + "_events.txt"; #default
+        print "processGazeLog: datafilename="+datafilename
+
         # check to see if it's empty; if so, delete it
         if os.path.isfile(datafilename) and os.path.getsize(datafilename)==0:
             print('processGazeLog: Eyelog2Dat: %s file is empty. Deleted' % datafilename)
             os.remove(datafilename)
         if not os.access(datafilename, os.R_OK):
+            # getting ready the process the *eye_log file to generate the datafile
+            if "logFileSuffix" in yamlconfig["study"].keys():
+                datalogfilename = basename + yamlconfig["study"]["logFileSuffix"]
+            else:
+                datalogfilename = basename + "_eye.log"; #default
             print('processGazeLog: Eyelog2Dat: %s file is not present' % datafilename)
             # now try to process and generate the file:
             if "gazeProcessingScript" in yamlconfig["study"].keys():
@@ -493,6 +499,7 @@ def processVideo(v):
                 print("processGazeLog: Error calling "+awkfile)
                 logging.error("processGazeLog: Error calling " +awkfile)
                 # sys.exit(1)
+
         # read all data
         try:
             alldata = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
@@ -502,7 +509,8 @@ def processVideo(v):
             logging.error("processGazeLog: file "+datafilename+" cannot be read.")
             return 
             #alldata = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
-            
+        
+        # process all the data, separate gaze/key/mouse events    
         alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
         
         #mouse= gaze[np.where(gaze.event=="mouseClick")]
@@ -516,8 +524,8 @@ def processVideo(v):
         
         #gaze = [row for row in reader(datafilename, delimiter='\t') if row[1] == 'gaze']
         if(gaze is not None and len(gaze) < 1):
-            print("Error reading gaze data! File="+datalogfilename)
-            logging.error("Error reading gaze data! File="+datalogfilename)
+            print("Error reading gaze data! File="+datafilename)
+            logging.error("Error reading gaze data! File="+datafilename)
         print "Gaze read from "+datafilename +" with n="+str(len(gaze))
         # end reading eye event log
     
