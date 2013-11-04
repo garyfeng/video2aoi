@@ -518,6 +518,8 @@ def processVideo(v):
         print "processGazeLog: keyboard data len = "+str(len(keystroke))
         # get all mouse events, moves and clicks
         mouse= alldata[np.where(np.logical_or( alldata.event=="mouseMove", alldata.event=="mouseClick"))]
+        if len(mouse)==0:
+            mouse= alldata[np.where(alldata.event=="mouse")]
         print "processGazeLog: mouse data len = "+str(len(mouse))
         gaze = alldata[np.where(alldata.event=="gaze")]
         print "processGazeLog: gaze data len = "+str(len(gaze))
@@ -641,7 +643,7 @@ def processVideo(v):
             # Keystroke logging
             ##############################
             if (keystroke is not None) and len(keystroke)>1:
-                temp = mouse[np.where(keystroke.t<=vTime+toffset)]   
+                temp = keystroke[np.where(keystroke.t<=vTime+toffset)]   
                 temp = temp[np.where(temp.t>lastGazetime)]   
                 #print "mouse = "+str(len(temp))
             #@ need to export all mouse events since last time, or skipping frame will skip mouse events
@@ -673,7 +675,7 @@ def processVideo(v):
                 # now go through the tasks and items
                 aoilist = []
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
-                aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S20'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+                aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
                 aoilist = aoilist.view(np.recarray)
                 # #if len(aoilist)>0:
                 # #    logging.info("AOIDump\n"+str(aoilist[0])+"\nAOIDUMP END\n")
