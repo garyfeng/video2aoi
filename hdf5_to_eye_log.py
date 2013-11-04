@@ -21,7 +21,7 @@ from operator import itemgetter
 import tables
 
 def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
-                    output_directory='.'):
+                    output_directory='.', origin='center', monitor_size='1920x1280'):
     '''
     Takes an HDF5 file and creates eye logs for each subject and experiment in
     file or filters on subject and/or experiment if specified.
@@ -30,7 +30,13 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     try:
       h5file = tables.openFile(hdf5_filename)
     except:
-      print ("Error, {} cannot be opened".format(hdf5_filename))
+      print ("Error: {} cannot be opened".format(hdf5_filename))
+      return False
+    # Parse monitor size
+    try:
+      monitorW, monitorH=[int(x) for x in monitor_size.split('x')]
+    except:
+      print("Error: monitor_size paramter '{}' cannot be parsed.".format(monitor_size))
       return False
 
     # Build handy dictionaries
@@ -73,10 +79,16 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                       firstGaze=False
                     # not first gaze
                     st=startTime[session_id] 
+                    gazex = int(round(row['{0}_gaze_x'.format(eye)]))
+                    gazey = int(round(row['{0}_gaze_y'.format(eye)]))
+                    # adjust for origin 
+                    gazex = gazex + int(monitorW/2) if origin=='center' else gazex
+                    gazey = gazey + int(monitorH/2) if origin=='center' else gazey
+
                     print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-st),
                                                 "gaze",
-                                                int(round(row['{0}_gaze_x'.format(eye)])),
-                                                int(round(row['{0}_gaze_y'.format(eye)])),
+                                                gazex,
+                                                gazey,
                                                 row["event_id"]),
                                           file=subject_log)
             subject_log.close()
@@ -124,13 +136,18 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'a') as subject_log:
               try:
-                st=startTime[session_id] 
                 for row in group_iter:
+                    st=startTime[session_id] 
+                    mousex = int(round(row["x_position"]))
+                    mousey = int(round(row["y_position"]))
+                    # adjust for origin 
+                    mousex = mousex + int(monitorW/2) if origin=='center' else mousex
+                    mousey = mousey + int(monitorH/2) if origin=='center' else mousey
                     if round(row['time']*1000)>st:
                         print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-st),
                                                   "mouse",
-                                                  int(round(row["x_position"])),
-                                                  int(round(row["y_position"])),
+                                                  mousex,
+                                                  mousey,
                                                   row['pressed_buttons']),
                           file=subject_log)
                 print ('Mouse: mouse events saved to {0}_eye.txt '.format(subject_code_dict[session_id]))
@@ -162,12 +179,25 @@ def main():
     parser.add_argument('-x', '--experiment',
                         help='The experiment you want to gaze data from. By \
                               default, dumps entire HDF5 file.')
+    parser.add_argument('-o', '--origin', 
+                        choices=['topleft', 'center'],
+                        default='center',
+                        help='The origin of the screen coordinate system. By \
+                              default, it is the center (per the current iohub setting).\
+                              If "topleft", then use the top-left corner.')
+    parser.add_argument('-m', '--monitor_size',
+                        default = '1920x1280',
+                        help='The resolution of the primary monitor. By \
+                              default, it is 1920x1280).\
+                              Specify in the format "WxH".')
     args = parser.parse_args()
 
     # Iterate through given files
     for hdf5_filename in args.hdf5_file:
         hdf5_to_eye_log(hdf5_filename, eye=args.eye, experiment=args.experiment,
-                        subject=args.subject)
+                        subject=args.subject, 
+                        origin = args.origin, 
+                        monitor_size=args.monitor_size)
 
 if __name__ == '__main__':
     main()

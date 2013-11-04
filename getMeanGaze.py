@@ -66,7 +66,9 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             data = [(row['{0}_gaze_x'.format(eye)], row['{0}_gaze_y'.format(eye)]) for row in group_iter]
             x = [gx for (gx, gy) in data]
             y = [gy for (gx, gy) in data]
-            print("{}:\tn={:d},\tx={:d},\ty={:d}".format(subject_code_dict[session_id], int(len(x)), int(sum(x)/len(x)), int(sum(y)/len(y))))
+            print("{} :: {}: n={:d}, x={:d}, y={:d}".format(hdf5_filename, 
+              subject_code_dict[session_id], 
+              int(len(x)), int(sum(x)/len(x)), int(sum(y)/len(y))))
 
     # close HDF5 file
     h5file.close()
