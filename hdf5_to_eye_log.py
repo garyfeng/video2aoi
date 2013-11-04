@@ -81,9 +81,9 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                     st=startTime[session_id] 
                     gazex = int(round(row['{0}_gaze_x'.format(eye)]))
                     gazey = int(round(row['{0}_gaze_y'.format(eye)]))
-                    # adjust for origin 
+                    # adjust for origin; y is flipped
                     gazex = gazex + int(monitorW/2) if origin=='center' else gazex
-                    gazey = gazey + int(monitorH/2) if origin=='center' else gazey
+                    gazey = - gazey + int(monitorH/2) if origin=='center' else gazey
 
                     print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-st),
                                                 "gaze",
@@ -142,7 +142,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                     mousey = int(round(row["y_position"]))
                     # adjust for origin 
                     mousex = mousex + int(monitorW/2) if origin=='center' else mousex
-                    mousey = mousey + int(monitorH/2) if origin=='center' else mousey
+                    mousey = - mousey + int(monitorH/2) if origin=='center' else mousey
                     if round(row['time']*1000)>st:
                         print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-st),
                                                   "mouse",
@@ -186,9 +186,9 @@ def main():
                               default, it is the center (per the current iohub setting).\
                               If "topleft", then use the top-left corner.')
     parser.add_argument('-m', '--monitor_size',
-                        default = '1920x1280',
+                        default = '1920x1080',
                         help='The resolution of the primary monitor. By \
-                              default, it is 1920x1280).\
+                              default, it is 1920x1080).\
                               Specify in the format "WxH".')
     args = parser.parse_args()
 
