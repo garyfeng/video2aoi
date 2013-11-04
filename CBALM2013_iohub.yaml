@@ -62,6 +62,7 @@ study:
     # Gaze/mouse Log file control
     # if True, will  read gaze/mouse log files; if False, will do video processing only
     processGazeLog: True
+    dataFileSuffix: "_events.txt"
     gazeProcessingScript: "eyelog2dat_iohub.awk"
     logFileSuffix: "_eye.log"
 
