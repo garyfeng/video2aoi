@@ -635,9 +635,10 @@ def processVideo(v):
                         mousetime= i["t"]
                         mousex=int(i["x"])
                         mousey=int(i["y"])
-                        if (not lastGazetime ==gazetime):
-                            logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
-                        lastGazetime=gazetime
+                        # if (not lastGazetime ==gazetime):
+                        #     logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
+                        # lastGazetime=gazetime
+                        logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
 
             ##############################
             # Keystroke logging
