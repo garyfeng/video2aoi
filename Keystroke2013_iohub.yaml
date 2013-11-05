@@ -136,11 +136,35 @@ items: &assessmentItems
             aoi: 569, 502, 782, 224
 
     Task4PlanOutlineFullScreen:
-        match: Task4PlanOutlineFullScreen.png
+        match: Task4PlanOutlineFullScreen.png, 0.001
         sourceLoc: 462, 324, 385, 64
         #destRange: 451, 315, 348, 142
         aoi: 461, 347, 998, 492
 
+    Task4PlanIdeaWebFullScreen:
+        match: Task4PlanIdeaWebFullScreen.png, 0.001
+        sourceLoc: 462, 324, 385, 64
+        #destRange: 451, 315, 348, 142
+        aoi: 461, 347, 998, 492
+
+    Task4PlanListFullScreen:
+        match: Task4PlanListFullScreen.png, 0.001
+        sourceLoc: 462, 324, 385, 64
+        #destRange: 451, 315, 348, 142
+        aoi: 461, 347, 998, 492
+        
+    Task4PlanIdeaTreeFullScreen:
+        match: Task4PlanIdeaTreeFullScreen.png, 0.001
+        sourceLoc: 462, 324, 385, 64
+        #destRange: 451, 315, 348, 142
+        aoi: 461, 347, 998, 492
+
+    Task4PlanFreeWritingFullScreen:
+        match: Task4PlanFreeWritingFullScreen.png, 0.001
+        sourceLoc: 462, 324, 385, 64
+        #destRange: 451, 315, 348, 142
+        aoi: 461, 347, 998, 492
+        
     Task4PlanPreviewFullScreen:
         match: Task4PlanPreviewFullScreen.png
         sourceLoc: 577, 311, 265, 210
@@ -173,6 +197,15 @@ items: &assessmentItems
         destRange: 780, 327, 200, 250
         aoi: 462, 347, 490, 530
 
+    Task4OopsError:
+        match: Task4OopsError.png
+        sourceLoc: 1008, 363, 459, 243
+        aoi: 960, 315, 510, 567
+
+    Task4TipsRight:
+        match: Task4TipsRight.png
+        sourceLoc: 1102, 477, 228, 199
+        aoi: 960, 315, 510, 567
 
 tasks:
 
@@ -189,13 +222,15 @@ tasks:
     # the typing screens do not have the CBAL sign so we have deal with them here. 
     TypingTestMainScreen:
         match: TypingTestMainScreen.png
-        sourceLoc: 732, 288, 164, 273
+        sourceLoc: 728, 317, 437, 320
+        # some subject scroll the screen up and down
+        destRange: 720, 110, 460, 600
         TypingDirections:
-            aoi: 450, 116, 1003, 349
+            relativeAOI: -220, 0, 1003, 150
         TypingSourceText:
-            aoi: 450, 465, 1003, 231
+            aoi: 0, 155, 440, 230
         TypingInputArea:
-            aoi: 450, 696, 1003, 326
+            aoi: 0, 386, 440, 242
 
     TypingTestResults:
         match: TypingTestResults.png
