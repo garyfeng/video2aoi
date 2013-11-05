@@ -619,40 +619,6 @@ def processVideo(v):
 
             txt="\tvideo='"+v+"'\tt="+str(vTime) +'\tframe='+str(frameNum)
 
-            ##############################
-            # mouse click logging
-            ##############################
-            # let's make them persistent
-            #mousex=-99; mousey=-99; mousetime =0
-            if (mouse is not None) and len(mouse)>1:
-                temp = mouse[np.where(mouse.t<=vTime+toffset)]   
-                temp = temp[np.where(temp.t>lastGazetime)]   
-                #print "mouse = "+str(len(temp))
-            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
-                if len(temp)>0:
-                    for i in temp:
-                        # found at least 1 match
-                        mousetime= i["t"]
-                        mousex=int(i["x"])
-                        mousey=int(i["y"])
-                        # if (not lastGazetime ==gazetime):
-                        #     logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
-                        # lastGazetime=gazetime
-                        logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
-
-            ##############################
-            # Keystroke logging
-            ##############################
-            if (keystroke is not None) and len(keystroke)>1:
-                temp = keystroke[np.where(keystroke.t<=vTime+toffset)]   
-                temp = temp[np.where(temp.t>lastGazetime)]   
-                #print "mouse = "+str(len(temp))
-            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
-                if len(temp)>0:
-                    for i in temp:
-                        logging.info("Keystroke: vt="+str(vTime)+"\tgzt="+str(i["t"])+"\tx="+""+"\ty="+""+"\tkey="+str(i["info"]))
-
-
             ################################################
             # now only process when there is a large change
             ################################################
@@ -752,7 +718,43 @@ def processVideo(v):
                         logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
 
                     # tracking things here
-                    lastGazetime=gazetime     
+                    lastGazetime=gazetime   
+
+            ##############################
+            # mouse click logging
+            ##############################
+            if (mouse is not None) and len(mouse)>1:
+                #temp = mouse[np.where(mouse.t<=vTime+toffset)]   
+                #temp = temp[np.where(temp.t>lastGazetime)]   
+                temp = mouse[np.where(np.logical_and(mouse.t>lastVTime+toffset, mouse.t<=vTime+toffset))]
+                #print "mouse = "+str(len(temp))
+            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
+                if len(temp)>0:
+                    for i in temp:
+                        # found at least 1 match
+                        mousetime= i["t"]
+                        mousex=int(i["x"])
+                        mousey=int(i["y"])
+                        # if (not lastGazetime ==gazetime):
+                        #     logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
+                        # lastGazetime=gazetime
+                        logging.info("Mouse:\tvt="+str(int(vTime))
+                            +"\tgzt="+str(int(mousetime))+"\tx="+str(int(mousex))
+                            +"\ty="+str(int(mousey))+"\tkey="+str(i["info"]))
+
+            ##############################
+            # Keystroke logging
+            ##############################
+            if (keystroke is not None) and len(keystroke)>1:
+                #temp = keystroke[np.where(keystroke.t<=vTime+toffset)]   
+                #temp = temp[np.where(temp.t>lastGazetime)]   
+                temp = keystroke[np.where(np.logical_and(keystroke.t>lastVTime+toffset, keystroke.t<=vTime+toffset))]
+                #print "mouse = "+str(len(temp))
+            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
+                if len(temp)>0:
+                    for i in temp:
+                        logging.info("Keystroke:\tvt="+str(int(vTime))
+                            +"\tgzt="+str(int(i["t"]))+"\tx="+""+"\ty="+""+"\tkey="+str(i["info"]))
 
             # end of AOI
             ############################
