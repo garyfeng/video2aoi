@@ -52,6 +52,211 @@ def findLastMatchOffset():
     # otherwise return the real deal
     return offset
 
+def getColorPlane():
+    '''Returns the color plane code specified in the YAML file'''
+    global yamlconfig
+
+    colorPlane = -99; #use all colors
+    if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:
+        colorPlane = -1
+    elif "useColorChannel" in yamlconfig["study"].keys():
+        if yamlconfig["study"]["useColorChannel"] == "B":
+            colorPlane = 0
+        elif yamlconfig["study"]["useColorChannel"] == "G":
+            colorPlane = 1
+        elif yamlconfig["study"]["useColorChannel"] == "R":
+            colorPlane = 2
+        else:
+            colorPlane = -1
+    logging.info("ColorPlane = "+str(colorPlane))
+    return colorPlane    
+
+def readEventData(basename):
+    ''' read the event log file as specified in basename and suffix in the yaml file.
+    Returns the data as a numpy Recarray. Else return None.
+    '''
+    global yamlconfig
+    # get the gaze/key/mouse data file name
+    if "dataFileSuffix" in yamlconfig["study"].keys():
+        datafilename = basename + yamlconfig["study"]["dataFileSuffix"]
+    else:
+        datafilename = basename + "_events.txt"; #default
+    print "processGazeLog: datafilename="+datafilename
+
+    # check to see if it's empty; if so, delete it
+    if os.path.isfile(datafilename) and os.path.getsize(datafilename)==0:
+        print('processGazeLog: Eyelog2Dat: %s file is empty. Deleted' % datafilename)
+        os.remove(datafilename)
+    if not os.access(datafilename, os.R_OK):
+        # getting ready the process the *eye_log file to generate the datafile
+        if "logFileSuffix" in yamlconfig["study"].keys():
+            datalogfilename = basename + yamlconfig["study"]["logFileSuffix"]
+        else:
+            datalogfilename = basename + "_eye.log"; #default
+        print('processGazeLog: Eyelog2Dat: %s file is not present' % datafilename)
+        # now try to process and generate the file:
+        if "gazeProcessingScript" in yamlconfig["study"].keys():
+            awkfile= yamlconfig["study"]["gazeProcessingScript"]
+        else:
+            # default
+            awkfile = "eyelog2dat.awk"
+        f = open(datafilename, "w")
+        call = ["gawk", "-f", awkfile , datalogfilename]
+        logging.info("AWK: \t"+str(call))
+        res = subprocess.call(call, shell=False, stdout=f)
+        f.close()
+        if res != 0:
+            print("processGazeLog: Error calling "+awkfile)
+            logging.error("processGazeLog: Error calling " +awkfile)
+            return None
+
+    # read all data
+    try:
+        alldata = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
+    except:
+        # no gaze file to read; fake one
+        print "processGazeLog: Error reading "+datafilename
+        logging.error("processGazeLog: file "+datafilename+" cannot be read.")
+        return None
+        #alldata = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
+    
+    # process all the data, separate gaze/key/mouse events    
+    alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
+    return alldata
+
+def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
+    '''Function to extract event info, and a time window, and log events inside the window.
+    Returns True if all goes well, or False if something is wrong.
+    allevents is of the format names=['t', 'event', 'x', 'y', 'info']
+    aoilist is of the format  dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)]
+    '''
+
+    # not the best idea but we need to keep track of these for displaying the gaze data. 
+    # unless we want to re-calculate these every time
+    global gazex, gazey, mousex, mousey, activeAOI
+
+    if len(allevents)==0: 
+        logging.error("logEvents: no event data")
+        return False
+    if (lastVTime>vTime):
+        logging.error("logEvents: lastVTime {} > vTime {}. Flipping them".format(lastVTime, vTime))
+        dump = vTime
+        vTime=lastVTime
+        lastVTime=dump
+ 
+    # the original algorithm only gets the last gaze sample 
+    # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
+    # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
+    #temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
+    frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+toffset, allevents.t<=vTime+toffset))]   
+    for e in frameEvents:
+        etime = int(e["t"])
+        # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
+        # if we use vTime in the output, we can't tell the exact video time
+        # so we back calculate here from gt:
+        videoTime = etime -toffset
+        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], videoTime, et, e["x"], e["y"], e["info"])
+
+        try:        
+            x=int(g["x"])
+            y=int(g["y"])
+        except:
+            # not available
+            x=-32768; y=-32768
+
+        
+        if len(aoi)==0:
+            aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
+            activeAOI=[]  
+        elif x>0 and y>0:
+            # this skips keystrokes and missing data, junk screen etc.
+            # now do aoi matching
+            activeAOI=aoilist[np.where(aoilist.x1<=x )]
+            activeAOI=activeAOI[np.where(activeAOI.x2>x)]
+            activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
+            activeAOI=activeAOI[np.where(activeAOI.y2>y)]
+            if len(activeAOI)>0:
+                for aoi in activeAOI:
+                    if not "__MATCH__" in aoi["id"]:
+                        # skip templates for template matching or tracking
+                        aoistring="\t".join([str(s) for s in aoi])
+            else:
+                # gaze is not on an AOI; print out the name of the page; keep in mind that aoilist[0] is the match template 
+                aoistring = str(aoilist[-1]["page"])+"\t\t\t\t\t\t"
+        else:
+            # for keystrokes or bad gaze data, etc. at least print the page
+            aoistring = str(aoilist[-1]["page"])+"\t\t\t\t\t\t"
+
+        # now let's log
+        logging.info(estring +"\taoi=" +aoistring)
+
+        # now track the last gaze and the last mouse events for this "frame"
+        if e["event"]=="gaze":
+            # update gaze pos no matter what; missing data -> missing
+            gazex =x; gazey =y; 
+        elif "mouse" in e["event"] and x>0 and y>0:
+            # don't update mosue location if there is no mouse info in this frame
+            mousex=x; mousey=y;
+
+    return True
+
+def displayFrame(windowName):
+    '''Shows the current frame of video, along with AOI and gaze/mouse '''
+    global frame, txt, yamlconfig, aoilist, vTime
+    global gazex, gazey, mousex, mousey, activeAOI
+
+    text_color = (128,128,128)
+    cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
+    # display rect for aoilist elements
+    if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
+        # if aoilist is not None:
+        for d in aoilist:
+            if "__MATCH__" in d["id"]:
+                # matching or tracking images
+                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
+            else:
+                # actual AOIs
+                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
+    
+    # displays the AOI of the last matched object
+    if len(aoilist)>0 and len(activeAOI)>0: 
+        for d in activeAOI:
+            if not ("__MATCH__" in d["id"]):
+                # actual active AOIs
+                cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
+                
+    # shows the gaze circle
+    if not np.isnan(gazex+gazey): 
+        cv2.circle(frame, (int(gazex), int(gazey)), 10, (0,0,255), -1)
+
+    # now show mouse, last pos; used to estimate toffset
+    if not np.isnan(mousex+mousey):
+        cv2.circle(frame, (int(mousex), int(mousey)), 20, (0,0,255), 2)
+        
+    cv2.imshow(windowName, frame)       # main window with video control
+        
+    # keyboard control; ESC = quit
+    key= cv2.waitKey(1) #key= cv2.waitKey(waitPerFrameInMillisec)
+    if (key==27):
+        logging.info("GUI: ESC pressed"+txt)
+        break
+    elif (key==32):
+        logging.info("GUI: paused"+txt)
+        cv2.waitKey()
+    # elif (key==43):
+        # frameNum+=500
+        # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
+        # forcedCalc=True
+    # elif (key==45):
+        # frameNum-=500
+        # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
+        # forcedCalc=True
+    elif (key>0):
+        # any other key saves a screenshot of the current frame
+        logging.info("GUI: key="+str(key)+"\tvideoFrame written to="+v+"_"+str(vTime)+".png"+txt)
+        cv2.imwrite(v+"_"+str(vTime)+".png", frame)
+        print key
+    else: pass
 
 # funcs to process the YAML config file
 signatureImageDict={}
@@ -65,19 +270,7 @@ def p2ReadSignatureImage(k, value, c):
         return True
     
     # set colorplane choices
-    colorPlane = -99; #use all colors
-    if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:
-        colorPlane = -1
-    elif "useColorChannel" in yamlconfig["study"].keys():
-        if yamlconfig["study"]["useColorChannel"] == "B":
-            colorPlane = 0
-        elif yamlconfig["study"]["useColorChannel"] == "G":
-            colorPlane = 1
-        elif yamlconfig["study"]["useColorChannel"] == "R":
-            colorPlane = 2
-        else:
-            colorPlane = -1
-    #logging.info("ColorPlane = "+str(colorPlane))
+    colorPlane = getColorPlane()
 
     # use the same YAML parsing method as p2Task()
     img = None
@@ -402,7 +595,8 @@ def processVideo(v):
     '''
     global yamlconfig, gaze, gazex, gazey, aoilist, toffset
     global video, frame, taskSigLoc, minVal, startFrame
-    global txt, essayID, lastEssayID, vTime, jumpAhead, skimmingMode
+    global txt, vTime, jumpAhead, skimmingMode
+    global gazex, gazey, mousex, mousey, activeAOI
     
     # local vars
     alldata=None
@@ -459,70 +653,27 @@ def processVideo(v):
     basename = os.path.basename(os.path.splitext(v)[0])
     processGazeLog = True
 
-    gaze=None; mouse=None; keystroke=None;
+    gaze=None; #mouse=None; #keystroke=None;
 
     if "processGazeLog" in yamlconfig["study"].keys():
         processGazeLog= yamlconfig["study"]["processGazeLog"]
     logging.info("processGazeLog: processGazeLog = "+str(processGazeLog))
     
     if processGazeLog:
-        # get the gaze/key/mouse data file name
-        if "dataFileSuffix" in yamlconfig["study"].keys():
-            datafilename = basename + yamlconfig["study"]["dataFileSuffix"]
-        else:
-            datafilename = basename + "_events.txt"; #default
-        print "processGazeLog: datafilename="+datafilename
 
-        # check to see if it's empty; if so, delete it
-        if os.path.isfile(datafilename) and os.path.getsize(datafilename)==0:
-            print('processGazeLog: Eyelog2Dat: %s file is empty. Deleted' % datafilename)
-            os.remove(datafilename)
-        if not os.access(datafilename, os.R_OK):
-            # getting ready the process the *eye_log file to generate the datafile
-            if "logFileSuffix" in yamlconfig["study"].keys():
-                datalogfilename = basename + yamlconfig["study"]["logFileSuffix"]
-            else:
-                datalogfilename = basename + "_eye.log"; #default
-            print('processGazeLog: Eyelog2Dat: %s file is not present' % datafilename)
-            # now try to process and generate the file:
-            if "gazeProcessingScript" in yamlconfig["study"].keys():
-                awkfile= yamlconfig["study"]["gazeProcessingScript"]
-            else:
-                # default
-                awkfile = "eyelog2dat.awk"
-            f = open(datafilename, "w")
-            call = ["gawk", "-f", awkfile , datalogfilename]
-            logging.info("AWK: \t"+str(call))
-            res = subprocess.call(call, shell=False, stdout=f)
-            f.close()
-            if res != 0:
-                print("processGazeLog: Error calling "+awkfile)
-                logging.error("processGazeLog: Error calling " +awkfile)
-                # sys.exit(1)
+        # read in alldata
+        alldata = readEventData(basename)
 
-        # read all data
-        try:
-            alldata = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
-        except:
-            # no gaze file to read; fake one
-            print "processGazeLog: Error reading "+datafilename
-            logging.error("processGazeLog: file "+datafilename+" cannot be read.")
-            return 
-            #alldata = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
-        
-        # process all the data, separate gaze/key/mouse events    
-        alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
-        
         #mouse= gaze[np.where(gaze.event=="mouseClick")]
-        keystroke= alldata[np.where(alldata.event=="keyboard")]
-        print "processGazeLog: keyboard data len = "+str(len(keystroke))
+        #keystroke= alldata[np.where(alldata.event=="keyboard")]
+        #print "processGazeLog: keyboard data len = "+str(len(keystroke))
         # get all mouse events, moves and clicks
-        mouse= alldata[np.where(np.logical_or( alldata.event=="mouseMove", alldata.event=="mouseClick"))]
-        if len(mouse)==0:
-            mouse= alldata[np.where(alldata.event=="mouse")]
-        print "processGazeLog: mouse data len = "+str(len(mouse))
+        # mouse= alldata[np.where(np.logical_or( alldata.event=="mouseMove", alldata.event=="mouseClick"))]
+        # if len(mouse)==0:
+        #     mouse= alldata[np.where(alldata.event=="mouse")]
+        # print "processGazeLog: mouse data len = "+str(len(mouse))
         gaze = alldata[np.where(alldata.event=="gaze")]
-        print "processGazeLog: gaze data len = "+str(len(gaze))
+        #print "processGazeLog: gaze data len = "+str(len(gaze))
         
         #gaze = [row for row in reader(datafilename, delimiter='\t') if row[1] == 'gaze']
         if(gaze is not None and len(gaze) < 1):
@@ -543,28 +694,15 @@ def processVideo(v):
     logging.info("NumFrames = "+str(nFrames)+"\tStartFrame = "+str(startFrame)+ "\tFPS="+str(fps))
 
     # init
-    essayID=None; lastEssayID="falseID"; #forcedCalc=False
-    #gazeline = None; gazecount=0; 
-    gazex=-999; gazey=-999; gazetime =0; lastGazetime=-999
+    gazex=-999; gazey=-999; mousex=-99; mousey=-99; activeAOI=[]
+
     # set the flag for skimmingMode
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
-    aoilist=[]; dump=[]; lastCounter=0; lastVTime=0;
-    mousex=-99; mousey=-99; mousetime =0
+    aoilist=[]; lastCounter=0; lastVTime=0;
 
     # set colorplane choices
-    colorPlane = -99; #use all colors
-    if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:
-        colorPlane = -1
-    elif "useColorChannel" in yamlconfig["study"].keys():
-        if yamlconfig["study"]["useColorChannel"] == "B":
-            colorPlane = 0
-        elif yamlconfig["study"]["useColorChannel"] == "G":
-            colorPlane = 1
-        elif yamlconfig["study"]["useColorChannel"] == "R":
-            colorPlane = 2
-        else:
-            colorPlane = -1
-    logging.info("ColorPlane = "+str(colorPlane))
+    colorPlane = getColorPlane()
+
 
     ###############################
     # now loop through the frames
@@ -610,8 +748,11 @@ def processVideo(v):
         else:
             # full color
             pass
-            
-        if flag:
+
+        ###############################
+        # if no error reading the frame  
+        ###############################  
+        if flag:    
             # captions
             vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
             if videoHeadMoved: 
@@ -644,116 +785,15 @@ def processVideo(v):
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
                 aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
                 aoilist = aoilist.view(np.recarray)
-                # #if len(aoilist)>0:
-                # #    logging.info("AOIDump\n"+str(aoilist[0])+"\nAOIDUMP END\n")
-                # # let's fast forward if no AOI is found (skipping over junkscreens)
-                # if len(aoilist) > 0:
-                #     # standard skipping rate
-                #     skimFrames = int(jumpAhead * fps) 
-                # else:
-                #     # no AOI
-                #     # fast forward; the price to pay is more frame-by-frame comaprisions
-                #     if skimFrames > int(jumpAhead * fps):
-                #         # last batch was a fastforward with NO AOI, so let's assume we are in a long stretch
-                #         frameChanged = False
-                #     skimFrames = int(jumpAhead * fps) *5
-                #     skimmingMode = True
-
-                #     logging.debug("SkimmingMode: No AOI found, fast forwarding.\tskimmingMode="+str(skimmingMode)+"\tlastCounter="+str(lastCounter)+"\tframeNum="+str(frameNum)+"\tskimFrames= "+str(skimFrames))
-                #     frameEngine.clearLastFrame()    # clear the lastFrame buffer, so that the first rewinded frame will be taken as the template to compare with.
-                #     continue
 
             
             ##############################
             # AOI logging
             ##############################
-            if processGazeLog and (gaze is not None and len(gaze) > 1):
-                # @@ this is where we should recalibrate 
-                # (a) redefine lineHeight and wordWidth so that no gap is left
-                # (b) get heatmap and estimate distribution to the left and top
-                  # edges and other "good features"; calc teh best fit
-                # (c) does kernalDensity or bleeding, so that we get a matrix
-                  # of the "activation" on each AOI over time
-
-                # the original algorithm only gets the last gaze sample 
-                # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
-                # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
-                temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
-                #print str(lastVTime) +"-"+str(vTime) +"="+ str(vTime-lastVTime)
-
-                for g in temp:
-                    gazetime= g["t"]
-                    gazex=int(g["x"])
-                    gazey=int(g["y"])
-                    gazeinfo= g["info"]
-
-                    # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
-                    # if we use vTime in the output, we can't tell the exact video time
-                    # so we back calculate here from gt:
-                    videoTime = gazetime -toffset
-
-                    # now need to find the AOI and log it
-                    # this means that the p2Task() need to have a global AOI array
-                    if  len(aoilist)<1:
-                        # a page without AOI, mostly likely junk 
-                        #logging.info("Gaze\tvt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
-                        logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi=JUNKSCREEN"+"\t\t\t\t\t\t")
-                    elif not np.isnan(gazex+gazey)  and gazetime !=lastGazetime:
-                        # aoilist is defined
-                        dump=aoilist[np.where(aoilist.x1<=gazex )]
-                        dump=dump[np.where(dump.x2>gazex)]
-                        dump=dump[np.where(dump.y1<=gazey)]
-                        dump=dump[np.where(dump.y2>gazey)]
-                        if len(dump)>0:
-                            for aoi in dump:
-                                if not "__MATCH__" in aoi["id"]:
-                                    # skip templates for matching or tracking
-                                    logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+"\t".join([str(s) for s in aoi]))
-                        else:
-                            # gaze is not on an AOI; print out the name of the page; keep in mind that aoilist[0] is the match template 
-                            logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[-1]["page"])+"\t\t\t\t\t\t")
-                    else:
-                        # invalid gazex or gazey
-                        logging.info("Gaze\tvt="+str(videoTime)+"\tgzt="+str(gazetime)+"\tx=-9999"+"\ty=-9999"+"\tinfo="+str(gazeinfo)+"\taoi="+str(aoilist[0]["page"])+"\t\t\t\t\t\t")
-
-                    # tracking things here
-                    lastGazetime=gazetime   
-
-            ##############################
-            # mouse click logging
-            ##############################
-            if processGazeLog and (mouse is not None) and len(mouse)>1:
-                #temp = mouse[np.where(mouse.t<=vTime+toffset)]   
-                #temp = temp[np.where(temp.t>lastGazetime)]   
-                temp = mouse[np.where(np.logical_and(mouse.t>lastVTime+toffset, mouse.t<=vTime+toffset))]
-                #print "mouse = "+str(len(temp))
-            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
-                if len(temp)>0:
-                    for i in temp:
-                        # found at least 1 match
-                        mousetime= i["t"]
-                        mousex=int(i["x"])
-                        mousey=int(i["y"])
-                        # if (not lastGazetime ==gazetime):
-                        #     logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
-                        # lastGazetime=gazetime
-                        logging.info("Mouse:\tvt="+str(int(vTime))
-                            +"\tgzt="+str(int(mousetime))+"\tx="+str(int(mousex))
-                            +"\ty="+str(int(mousey))+"\tbutton="+str(i["info"]))
-
-            ##############################
-            # Keystroke logging
-            ##############################
-            if processGazeLog and (keystroke is not None) and len(keystroke)>1:
-                #temp = keystroke[np.where(keystroke.t<=vTime+toffset)]   
-                #temp = temp[np.where(temp.t>lastGazetime)]   
-                temp = keystroke[np.where(np.logical_and(keystroke.t>lastVTime+toffset, keystroke.t<=vTime+toffset))]
-                #print "mouse = "+str(len(temp))
-            #@ need to export all mouse events since last time, or skipping frame will skip mouse events
-                if len(temp)>0:
-                    for i in temp:
-                        logging.info("Keystroke:\tvt="+str(int(vTime))
-                            +"\tgzt="+str(int(i["t"]))+"\tx="+""+"\ty="+""+"\tkey="+str(i["info"]))
+            if processGazeLog:
+                if not logEvents(alldata, aoilist, lastVTime, vTime, toffset):
+                    # error logging, which shouldn't happen
+                    logging.error("processGazeLog: error logging events for {}-{}, tOffset={}".format(lastVTime, vTime, tOffset))
 
             # end of AOI logging, do some updates:
             lastVTime = vTime   # used to track gazes during skimming.
@@ -762,76 +802,14 @@ def processVideo(v):
             # display video
             ############################
             if showVideo:
-                text_color = (128,128,128)
-                txt = txt+"\t"+str(parser.ocrPageTitle)
-                cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
-                # display rect for aoilist elements
-                if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
-                    # if aoilist is not None:
-                    for d in aoilist:
-                        if "__MATCH__" in d["id"]:
-                            # matching or tracking images
-                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
-                        else:
-                            # actual AOIs
-                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
-                            
-                # shows the gaze circle
-                if not np.isnan(gazex+gazey): 
-                    cv2.circle(frame, (int(gazex), int(gazey)), 10, (0,0,255), -1)
-                
-                # displays the AOI of the last matched object
-                if len(aoilist)>0 and len(dump)>0: 
-                    for d in dump:
-                        if not ("__MATCH__" in d["id"]):
-                            # actual active AOIs
-                            cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
-
-                    #cv2.rectangle(frame, (dump.x1[-1], dump.y1[-1]), (dump.x2[-1], dump.y2[-1]), text_color,2)
-                # now show mouse, last pos; used to estimate toffset
-                #curmouse = mouse[np.where(mouse.t<=vTime+ toffset)]
-                # curmouse = None
-                # if mouse is not None: 
-                #     #curmouse = gaze[np.where(gaze.t<=vTime+ toffset)]
-                #     curmouse = mouse[np.where(gaze.t<=vTime+ toffset)]
-                #     if curmouse is not None and len(curmouse)>0: 
-                #         cv2.circle(frame, (int(curmouse.x[-1]), int(curmouse.y[-1])), 10, (0,0,255), -1)
-                if not np.isnan(mousex+mousey):
-                    cv2.circle(frame, (int(mousex), int(mousey)), 20, (0,0,255), 2)
-                    
-                cv2.imshow(windowName, frame)       # main window with video control
-                #if txtScrollImage is not None: cv2.imshow("txtScrollImage", txtScrollImage)
-                #if txtBitmap is not None: cv2.imshow("txt", txtBitmap)
-                    
-                # keyboard control; ESC = quit
-                key= cv2.waitKey(1) #key= cv2.waitKey(waitPerFrameInMillisec)
-                if (key==27):
-                    logging.info("Key: ESC pressed"+txt)
-                    break
-                elif (key==32):
-                    logging.info("Key: paused"+txt)
-                    cv2.waitKey()
-                # elif (key==43):
-                    # frameNum+=500
-                    # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
-                    # forcedCalc=True
-                # elif (key==45):
-                    # frameNum-=500
-                    # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
-                    # forcedCalc=True
-                elif (key>0):
-                    # any other key saves a screenshot of the current frame
-                    logging.info("Key: key="+str(key)+"\tvideoFrame written to="+v+"_"+str(essayID)+"_"+str(vTime)+".png"+txt)
-                    cv2.imwrite(v+"_"+str(essayID)+"_"+str(vTime)+".png", frame)
-                    print key
-                else: pass
+                displayFrame(windowName)
 
             # console output, every 200 frames        
             if (frameNum%1000 ==0):
                 print " "+str(int(vTime/1000)), 
                 if showVideo: cv2.setTrackbarPos(taskbarName, windowName, int(frameNum/100))
         else:
-            logging.error("Error reading video frame: vt="+str(vTime)+"\tgzt="+str(gazetime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\taoi=")
+            logging.error("Error reading video frame: vt="+str(vTime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\taoi=")
             pass # no valid video frames; most likely EOF
 
     logging.info("Ended:"+txt)
@@ -902,8 +880,6 @@ if __name__ == "__main__":
 
     frame=None
     vTime=0
-    essayID=None
-    lastEssayID="falseID"
     gaze=None
     gazex=0; gazey=0;
     # for skimmingMode, # of seconds to jump ahead
