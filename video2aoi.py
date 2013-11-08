@@ -739,7 +739,7 @@ def processVideo(v):
                         # lastGazetime=gazetime
                         logging.info("Mouse:\tvt="+str(int(vTime))
                             +"\tgzt="+str(int(mousetime))+"\tx="+str(int(mousex))
-                            +"\ty="+str(int(mousey))+"\tkey="+str(i["info"]))
+                            +"\ty="+str(int(mousey))+"\tbutton="+str(i["info"]))
 
             ##############################
             # Keystroke logging
