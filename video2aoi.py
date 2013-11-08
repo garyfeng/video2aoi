@@ -681,7 +681,6 @@ def processVideo(v):
                 temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
                 #print str(lastVTime) +"-"+str(vTime) +"="+ str(vTime-lastVTime)
 
-                lastVTime = vTime   # used to track gazes during skimming.
                 for g in temp:
                     gazetime= g["t"]
                     gazex=int(g["x"])
@@ -723,7 +722,7 @@ def processVideo(v):
             ##############################
             # mouse click logging
             ##############################
-            if (mouse is not None) and len(mouse)>1:
+            if processGazeLog and (mouse is not None) and len(mouse)>1:
                 #temp = mouse[np.where(mouse.t<=vTime+toffset)]   
                 #temp = temp[np.where(temp.t>lastGazetime)]   
                 temp = mouse[np.where(np.logical_and(mouse.t>lastVTime+toffset, mouse.t<=vTime+toffset))]
@@ -745,7 +744,7 @@ def processVideo(v):
             ##############################
             # Keystroke logging
             ##############################
-            if (keystroke is not None) and len(keystroke)>1:
+            if processGazeLog and (keystroke is not None) and len(keystroke)>1:
                 #temp = keystroke[np.where(keystroke.t<=vTime+toffset)]   
                 #temp = temp[np.where(temp.t>lastGazetime)]   
                 temp = keystroke[np.where(np.logical_and(keystroke.t>lastVTime+toffset, keystroke.t<=vTime+toffset))]
@@ -756,7 +755,9 @@ def processVideo(v):
                         logging.info("Keystroke:\tvt="+str(int(vTime))
                             +"\tgzt="+str(int(i["t"]))+"\tx="+""+"\ty="+""+"\tkey="+str(i["info"]))
 
-            # end of AOI
+            # end of AOI logging, do some updates:
+            lastVTime = vTime   # used to track gazes during skimming.
+
             ############################
             # display video
             ############################
