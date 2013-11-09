@@ -148,24 +148,27 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
     # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
     #temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
-    frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+toffset, allevents.t<=vTime+toffset))]   
+    frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+toffset, allevents.t<=vTime+toffset))]  
+    # sort by time so that the output is in order 
+    frameEvents.sort(order="t")
     for e in frameEvents:
         etime = int(e["t"])
         # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
         # if we use vTime in the output, we can't tell the exact video time
         # so we back calculate here from gt:
         videoTime = etime -toffset
-        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], videoTime, et, e["x"], e["y"], e["info"])
+        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], int(videoTime), etime, e["x"], e["y"], e["info"])
 
         try:        
-            x=int(g["x"])
-            y=int(g["y"])
+            x=int(e["x"])
+            y=int(e["y"])
         except:
             # not available
             x=-32768; y=-32768
 
-        
-        if len(aoi)==0:
+        # you shouldn't have a case whereaoistring is undefined without the follow ling but it had occurred. 
+        aoistring = "SOMETHINGWRONG"+"\t\t\t\t\t\t"
+        if len(aoilist)==0:
             aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
             activeAOI=[]  
         elif x>0 and y>0:
@@ -191,7 +194,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         logging.info(estring +"\taoi=" +aoistring)
 
         # now track the last gaze and the last mouse events for this "frame"
-        if e["event"]=="gaze":
+        if "gaze" in e["event"]:
             # update gaze pos no matter what; missing data -> missing
             gazex =x; gazey =y; 
         elif "mouse" in e["event"] and x>0 and y>0:
@@ -206,6 +209,7 @@ def displayFrame(windowName):
     global gazex, gazey, mousex, mousey, activeAOI
 
     text_color = (128,128,128)
+    txt+= ", gaze=({}, {}), mouse=({}, {})".format(gazex, gazey, mousex, mousey)
     cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
     # display rect for aoilist elements
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
@@ -239,7 +243,7 @@ def displayFrame(windowName):
     key= cv2.waitKey(1) #key= cv2.waitKey(waitPerFrameInMillisec)
     if (key==27):
         logging.info("GUI: ESC pressed"+txt)
-        break
+        return False
     elif (key==32):
         logging.info("GUI: paused"+txt)
         cv2.waitKey()
@@ -257,6 +261,8 @@ def displayFrame(windowName):
         cv2.imwrite(v+"_"+str(vTime)+".png", frame)
         print key
     else: pass
+
+    return True
 
 # funcs to process the YAML config file
 signatureImageDict={}
@@ -673,13 +679,13 @@ def processVideo(v):
         #     mouse= alldata[np.where(alldata.event=="mouse")]
         # print "processGazeLog: mouse data len = "+str(len(mouse))
         gaze = alldata[np.where(alldata.event=="gaze")]
-        #print "processGazeLog: gaze data len = "+str(len(gaze))
+        print "processGazeLog: gaze data len = "+str(len(gaze))
         
         #gaze = [row for row in reader(datafilename, delimiter='\t') if row[1] == 'gaze']
         if(gaze is not None and len(gaze) < 1):
-            print("Error reading gaze data! File="+datafilename)
-            logging.error("Error reading gaze data! File="+datafilename)
-        print "Gaze read from "+datafilename +" with n="+str(len(gaze))
+            print("Error reading gaze data! File="+basename)
+            logging.error("Error reading gaze data! File="+basename)
+        print "Gaze read from "+basename +" with n="+str(len(gaze))
         # end reading eye event log
     
     # now let's skip the video to the first gaze time, but only if startFrame is not deberately set.
@@ -802,14 +808,14 @@ def processVideo(v):
             # display video
             ############################
             if showVideo:
-                displayFrame(windowName)
+                if not displayFrame(windowName): break
 
-            # console output, every 200 frames        
-            if (frameNum%1000 ==0):
-                print " "+str(int(vTime/1000)), 
+            # console output, every 10sec video time        
+            if (vTime%10000 ==0):
+                print " "+str(int(vTime/10000)*10), 
                 if showVideo: cv2.setTrackbarPos(taskbarName, windowName, int(frameNum/100))
         else:
-            logging.error("Error reading video frame: vt="+str(vTime)+"\tx="+str(gazex)+"\ty="+str(gazey)+"\taoi=")
+            logging.error("Error reading video frame: vt="+str(vTime)+"\tx="+str(gazex)+"\ty="+str(gazey))
             pass # no valid video frames; most likely EOF
 
     logging.info("Ended:"+txt)
