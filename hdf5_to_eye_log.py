@@ -61,7 +61,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     table = h5file.root.data_collection.events.eyetracker.BinocularEyeSampleEvent
     # Do query, all gaze, including missing or invalid gaze
     # this is necessary if later we want to know the % of missing data
-    valid_rows = sorted(table.readWhere(filter_string+' & (status==0)'), key=itemgetter('experiment_id',
+    valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
                                                                        'session_id',
                                                                        'time'))
     # Proceed if we got anything
@@ -70,14 +70,20 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
         for session_id, group_iter in groupby(valid_rows, key=itemgetter('session_id')):
             with open(os.path.join(output_directory, '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'w') as subject_log:
-                firstGaze = True
+                gotFirstGaze = False
 
                 for row in group_iter:
-                    if firstGaze:
+                    # skip all junk gaze data until the first valid sample
+                    if not gotFirstGaze and row['status'] != 0:
+                      # skip
+                      continue
+                    elif not gotFirstGaze and row['status'] == 0:
+                      # first gaze reading
                       startTime[session_id] = int(round(row['time']*1000))
                       print ('Now processing: {0}_eye.txt, startTime = {1}'.format(subject_code_dict[session_id], startTime[session_id]))
                       #print (str(startTime))
-                      firstGaze=False
+                      gotFirstGaze=True 
+                      
                     # not first gaze; subtract the known startTime
                     st=startTime[session_id] 
                     # export missing values if the status !=0
