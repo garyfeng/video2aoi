@@ -15,7 +15,7 @@ from __future__ import print_function, unicode_literals, with_statement
 #import numpy
 import argparse
 import os
-from itertools import izip, groupby
+from itertools import groupby
 from operator import itemgetter
 
 import tables
@@ -59,7 +59,8 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
 
     # get the eyegaze table first
     table = h5file.root.data_collection.events.eyetracker.BinocularEyeSampleEvent
-    # Do query, valid gaze only
+    # Do query, all gaze, including missing or invalid gaze
+    # this is necessary if later we want to know the % of missing data
     valid_rows = sorted(table.readWhere(filter_string+' & (status==0)'), key=itemgetter('experiment_id',
                                                                        'session_id',
                                                                        'time'))
@@ -77,14 +78,18 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                       print ('Now processing: {0}_eye.txt, startTime = {1}'.format(subject_code_dict[session_id], startTime[session_id]))
                       #print (str(startTime))
                       firstGaze=False
-                    # not first gaze
+                    # not first gaze; subtract the known startTime
                     st=startTime[session_id] 
-                    gazex = int(round(row['{0}_gaze_x'.format(eye)]))
-                    gazey = int(round(row['{0}_gaze_y'.format(eye)]))
-                    # adjust for origin; y is flipped
-                    gazex = gazex + int(monitorW/2) if origin=='center' else gazex
-                    gazey = - gazey + int(monitorH/2) if origin=='center' else gazey
-
+                    # export missing values if the status !=0
+                    if row['status']==0:
+                      gazex = int(round(row['{0}_gaze_x'.format(eye)]))
+                      gazey = int(round(row['{0}_gaze_y'.format(eye)]))
+                      # adjust for origin; y is flipped
+                      gazex = gazex + int(monitorW/2) if origin=='center' else gazex
+                      gazey = - gazey + int(monitorH/2) if origin=='center' else gazey
+                    else:
+                      gazex = -32768; gazey=-32768
+                    # now export
                     print('{0:d}\t{1}\t{2:d}\t{3:d}\t{4}'.format( int(round(row['time']*1000)-st),
                                                 "gaze",
                                                 gazex,
