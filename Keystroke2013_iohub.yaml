@@ -117,9 +117,9 @@ items: &assessmentItems
         # so we need this destRange to search vertically
         destRange: 980, 349, 200, 147
         EssayDirections:
-            relativeAOI: 0, 0, 433, 111
+            relativeAOI: 0, 0, 450, 111
         EssayInput:
-            relativeAOI: 0, 112, 433, 343
+            relativeAOI: 0, 112, 450, 343
 
     Task4FeedbackSubmitted:
         match: Task4FeedbackSubmitted.png
@@ -152,7 +152,7 @@ items: &assessmentItems
         sourceLoc: 462, 324, 385, 64
         #destRange: 451, 315, 348, 142
         aoi: 461, 347, 998, 492
-        
+
     Task4PlanIdeaTreeFullScreen:
         match: Task4PlanIdeaTreeFullScreen.png, 0.001
         sourceLoc: 462, 324, 385, 64
@@ -164,7 +164,7 @@ items: &assessmentItems
         sourceLoc: 462, 324, 385, 64
         #destRange: 451, 315, 348, 142
         aoi: 461, 347, 998, 492
-        
+
     Task4PlanPreviewFullScreen:
         match: Task4PlanPreviewFullScreen.png
         sourceLoc: 577, 311, 265, 210
@@ -247,6 +247,7 @@ tasks:
         # log: taskName='assessment'
         # ocr: 617, 281 ,49, 16
         # the CBAL standard tool bars
+        aoi: 445, 245, 1024, 640
         TOOLBARLEFT:
             aoi: 450, 245, 308, 67
         TOOLBARMID:
