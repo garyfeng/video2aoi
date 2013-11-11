@@ -143,6 +143,9 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         dump = vTime
         vTime=lastVTime
         lastVTime=dump
+
+    # set gaze pos to missing, but not mouse pos
+    gazex=-32768; gazey=-32768;
  
     # the original algorithm only gets the last gaze sample 
     # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
@@ -478,7 +481,7 @@ def p2Task(k, value, context):
                 # the x,y,w,h format: convert to xyxy format
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
-        pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor/tab1', only path to the parent 
+        pageTitle = "/".join(context+[k])        # 'Assessment/items/Task3DearEditor'
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
@@ -504,7 +507,7 @@ def p2Task(k, value, context):
         coord[2]=coord[2]+ objoffset[0]
         coord[3]=coord[3]+ objoffset[1]
         # output
-        pageTitle = "/".join(context)
+        pageTitle = "/".join(context+[k])
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
