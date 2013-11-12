@@ -191,7 +191,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
                 aoistring = str(aoilist[-1]["page"])+"\t\t\t\t\t\t"
         else:
             # for keystrokes or bad gaze data, etc. at least print the page
-            aoistring = str(aoilist[-1]["page"])+"\t\t\t\t\t\t"
+            aoistring = "\t"+"\t\t\t\t\t\t"
 
         # now let's log
         logging.info(estring +"\taoi=" +aoistring)
