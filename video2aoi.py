@@ -197,6 +197,9 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         logging.info(estring +"\taoi=" +aoistring)
 
         # now track the last gaze and the last mouse events for this "frame"
+        #@@ this is ugly -- using global vars
+        # should be something like
+        #  frameEngine.updateCurrentGaze(x,y)
         if "gaze" in e["event"]:
             # update gaze pos no matter what; missing data -> missing
             gazex =x; gazey =y; 
@@ -602,8 +605,8 @@ def processVideo(v):
 
     @@ gaze etc don't have to be global variables.@@ 
     '''
-    global yamlconfig, gaze, gazex, gazey, aoilist, toffset
-    global video, frame, taskSigLoc, minVal, startFrame
+    global yamlconfig, gaze, aoilist, toffset
+    global video, frame,  startFrame #, minVal, taskSigLoc,
     global txt, vTime, jumpAhead, skimmingMode
     global gazex, gazey, mousex, mousey, activeAOI
     
@@ -870,34 +873,14 @@ if __name__ == "__main__":
     frameEngine.frameChangeThreshold=yamlconfig["study"]["frameChangeThreshold"]
     frameEngine.matchTemplateThreshold=float(yamlconfig["study"]["matchTemplateThreshold"])
 
-
     # init global vars
     startFrame= yamlconfig["study"]["startFrame"]
-    #forcedCalc=False
-    lastFrame=None
-    diffFrame=None
-    tmp=None; match=None; tmp_old=None
-    halfFrame=None
-    halfImage=None
-    minLoc = None
-    minVal = None
-    taskSigLoc=None
-    txtBitmap=None
-    txtScrollImage=None
-    txt=""
-    video=None
-
-    frame=None
-    vTime=0
-    gaze=None
-    gazex=0; gazey=0;
     # for skimmingMode, # of seconds to jump ahead
     if "jumpAhead" in yamlconfig["study"]:
         jumpAhead = yamlconfig["study"]["jumpAhead"]
     else:
         jumpAhead = 0.5
-    skimmingMode=False
-    
+
     # this is the async estimated by looking at video mouse movement and 
     #  cursor display based on the data from the mouse event log
     # quick hack, should be estimated automatically using template matching
@@ -905,6 +888,26 @@ if __name__ == "__main__":
         toffset = yamlconfig["study"]["videogazeoffset"]
     else:
         toffset = -600
+    #forcedCalc=False
+    #lastFrame=None
+    #diffFrame=None
+    #tmp=None; match=None; #tmp_old=None
+    #halfFrame=None
+    #halfImage=None
+    #minLoc = None
+    #minVal = None
+    #taskSigLoc=None
+    #txtBitmap=None
+    #txtScrollImage=None
+    txt=""
+    #video=None
+
+    frame=None
+    vTime=0
+    gaze=None
+    gazex=0; gazey=0;
+    skimmingMode=False
+    signatureImageDict=[]
     
 
     #logging.info("VideoFilePattern = "+str(v))
