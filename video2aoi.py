@@ -30,6 +30,12 @@ def updateAOI (data):
         print "Error in UpdateAOI: data = "+str(data)
         return
         
+    # here we enforce that the item name is in the "page" field
+    # data[0]=data[0].replace("Assessment/items", "")
+    # if len(data[0])==0:
+    #     # if it's Assessment/items, then the aoiID becomes the page name
+    #     data[0]=data[1]
+
     aoilist.append(data)
 
 def findLastMatchOffset():
@@ -171,6 +177,13 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
         # you shouldn't have a case whereaoistring is undefined without the follow ling but it had occurred. 
         aoistring = "SOMETHINGWRONG"+"\t\t\t\t\t\t"
+        currItem = ""
+        for a in aoilist:
+            logging.debug("logEvents: aoi page = {}".format(a["page"]))
+            if a["page"].find("Assessment/items") >0:
+                currItem = a["page"]
+                logging.debug("logEvents: currItem = {}".format(currItem))
+                break
         if len(aoilist)==0:
             aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
             activeAOI=[]  
@@ -187,11 +200,14 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
                         # skip templates for template matching or tracking
                         aoistring="\t".join([str(s) for s in aoi])
             else:
-                # gaze is not on an AOI; print out the name of the page; keep in mind that aoilist[0] is the match template 
-                aoistring = str(aoilist[-1]["page"])+"\t\t\t\t\t\t"
+                # gaze is not on an AOI; print out the name of the page; 
+                # keep in mind that aoilist[0] is the match template, which is not useful; 
+                # [-1] is often some other junk model thrown at the Assessment level, which we often don't want
+                # this should have a persistent "item" code even if the gaze is not on the item 
+                aoistring = str(currItem)+"\t\t\t\t\t\t"
         else:
             # for keystrokes or bad gaze data, etc. at least print the page
-            aoistring = "\t"+"\t\t\t\t\t\t"
+            aoistring = str(currItem)+"\t\t\t\t\t\t"
 
         # now let's log
         logging.info(estring +"\taoi=" +aoistring)
@@ -281,8 +297,6 @@ def p2ReadSignatureImage(k, value, c):
         # not a dict, no need to process
         return True
     
-    # set colorplane choices
-    colorPlane = getColorPlane()
 
     # use the same YAML parsing method as p2Task()
     img = None
@@ -294,6 +308,9 @@ def p2ReadSignatureImage(k, value, c):
         # not not something we want to process
         #logging.error("p2ReadSignatureImage: expecting match or track but got "+str(value))
         return True
+
+    # set colorplane choices
+    colorPlane = getColorPlane()
 
     fname = para[0]
     if not isinstance(fname, str): 
@@ -484,7 +501,7 @@ def p2Task(k, value, context):
                 # the x,y,w,h format: convert to xyxy format
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
-        pageTitle = "/".join(context+[k])        # 'Assessment/items/Task3DearEditor'
+        pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor'
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
@@ -510,7 +527,7 @@ def p2Task(k, value, context):
         coord[2]=coord[2]+ objoffset[0]
         coord[3]=coord[3]+ objoffset[1]
         # output
-        pageTitle = "/".join(context+[k])
+        pageTitle = "/".join(context)
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
@@ -907,7 +924,7 @@ if __name__ == "__main__":
     gaze=None
     gazex=0; gazey=0;
     skimmingMode=False
-    signatureImageDict=[]
+    #signatureImageDict=[]
     
 
     #logging.info("VideoFilePattern = "+str(v))
