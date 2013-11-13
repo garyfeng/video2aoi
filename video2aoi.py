@@ -7,6 +7,8 @@ import numpy as np
 import glob
 import logging
 import subprocess
+import argparse
+
 
 from TessEngine import *    #TessEngine, TessHTMLParser, imgTessHTMLParser
 from FrameEngine import *    #FrameEngine
@@ -179,11 +181,14 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         aoistring = "SOMETHINGWRONG"+"\t\t\t\t\t\t"
         currItem = ""
         for a in aoilist:
-            logging.debug("logEvents: aoi page = {}".format(a["page"]))
-            if a["page"].find("Assessment/items") >0:
+            #logging.debug("logEvents: aoi page = {}".format(a["page"]))
+            # if the page title starts with Assessment/items, then this is the page, and we exit this loop
+            if a["page"].find("Assessment/items") ==0:
                 currItem = a["page"]
                 logging.debug("logEvents: currItem = {}".format(currItem))
                 break
+
+        # Now start to assign AOI, for each matching AOI; if there are no matching AOIs, we print the page title        
         if len(aoilist)==0:
             aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
             activeAOI=[]  
@@ -620,9 +625,9 @@ def processVideo(v):
     '''Process a video file, and log the events and AOIs to the log file.
     It uses the global settings from the yamlconfig object. 
 
-    @@ gaze etc don't have to be global variables.@@ 
     '''
-    global yamlconfig, gaze, aoilist, toffset
+
+    global yamlconfig, gaze, aoilist, toffset, logLevel
     global video, frame,  startFrame #, minVal, taskSigLoc,
     global txt, vTime, jumpAhead, skimmingMode
     global gazex, gazey, mousex, mousey, activeAOI
@@ -632,19 +637,15 @@ def processVideo(v):
 
     # init vars
     try:
-        startFrame= yamlconfig["study"]["startFrame"]
-    except:
-        startFrame=1
-    try:
         ratio = yamlconfig["study"]["scalingRatio"]
     except:
         ratio = 1
     
     # create new log for the file v
     logfilename = os.getcwd()+"\\"+str(v)+"_AOI.log"
-    logLevel = logging.INFO
-    if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"]:
-        logLevel= logging.DEBUG
+    #logLevel = logging.INFO
+    # if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"]:
+    #     logLevel= logging.DEBUG
     #logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(asctime)s\t%(message)s', level=logging.DEBUG)
     logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logLevel)
     
@@ -682,7 +683,7 @@ def processVideo(v):
     basename = os.path.basename(os.path.splitext(v)[0])
     processGazeLog = True
 
-    gaze=None; #mouse=None; #keystroke=None;
+    gaze=None; 
 
     if "processGazeLog" in yamlconfig["study"].keys():
         processGazeLog= yamlconfig["study"]["processGazeLog"]
@@ -693,14 +694,6 @@ def processVideo(v):
         # read in alldata
         alldata = readEventData(basename)
 
-        #mouse= gaze[np.where(gaze.event=="mouseClick")]
-        #keystroke= alldata[np.where(alldata.event=="keyboard")]
-        #print "processGazeLog: keyboard data len = "+str(len(keystroke))
-        # get all mouse events, moves and clicks
-        # mouse= alldata[np.where(np.logical_or( alldata.event=="mouseMove", alldata.event=="mouseClick"))]
-        # if len(mouse)==0:
-        #     mouse= alldata[np.where(alldata.event=="mouse")]
-        # print "processGazeLog: mouse data len = "+str(len(mouse))
         gaze = alldata[np.where(alldata.event=="gaze")]
         print "processGazeLog: gaze data len = "+str(len(gaze))
         
@@ -732,7 +725,6 @@ def processVideo(v):
     # set colorplane choices
     colorPlane = getColorPlane()
 
-
     ###############################
     # now loop through the frames
     ###############################
@@ -761,8 +753,7 @@ def processVideo(v):
             # here you don't want to clear the frameEngine.lastFrame, because you want to detect the first change.
 
         # skimming mode: skipping frames at a time
-        if skimFrames>0:
-            if skimmingMode and frameNum % skimFrames >0 : continue
+        if skimmingMode and skimFrames>0 and  frameNum % skimFrames >0 : continue
         
         # read the frame
         flag, frame = video.retrieve()
@@ -837,45 +828,61 @@ def processVideo(v):
             if (vTime%10000 ==0):
                 print " "+str(int(vTime/10000)*10), 
                 if showVideo: cv2.setTrackbarPos(taskbarName, windowName, int(frameNum/100))
+        ##################
+        # if flag:
+        ##################
         else:
             logging.error("Error reading video frame: vt="+str(vTime)+"\tx="+str(gazex)+"\ty="+str(gazey))
             pass # no valid video frames; most likely EOF
-
+    #########
+    # no more frames
+    #########
     logging.info("Ended:"+txt)
     logging.shutdown()    
 
-if __name__ == "__main__":
+def main():
+    ''' Main function that processes arguments and gets things started. '''
+    global yamlconfig, tess, parser, frameEngine, startFrame, showVideo, jumpAhead, txt, toffset, skimmingMode, logLevel
 
-    ##########################
-    # global/main:
-    ###########################################################
-    # Starting
-    showVideo=True
-    v="*.avi"
-    # video input filename
-    if(len(sys.argv)==3):
-        yamlfile = sys.argv[1]
-        v=sys.argv[2]
-    elif(len(sys.argv)==4):
-        yamlfile = sys.argv[1]
-        v=sys.argv[2]
-        if(sys.argv[3]=="-novideo"): showVideo=False
-    else:
-        print "Usage: python video2aoi.py config.yaml videofile.avi [-novideo]"
-        print "where: config.yaml is the configuration file for the video"
-        print "       videofile.avi is the video file to process"
-        print "       and we assume the videofile_eye.log file is in the same directory"
-        print "       in order to extract the eyegaze data"
-        print "       Use -novideo to speed up the processing by x2 or more"
-        sys.exit(0)
-    
-    # getting yaml definition and make sure all the required elements are there
-    yamlfile = sys.argv[1]
+    # Get command line arguments
+    parser = argparse.ArgumentParser(
+        description="Usage: python video2aoi.py config.yaml videofile.avi .",
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        conflict_handler='resolve')
+    parser.add_argument('avifiles',
+                        help='The video file(s) to process.', nargs='+')
+    parser.add_argument('-l', '--logLevel',
+                        help='The level of informatin to be logged.',
+                        choices=['INFO', 'DEBUG'],
+                        default='INFO')
+    parser.add_argument('-s', '--startFrame',
+                        help='The frame number to start processing.', default='ignore')
+    parser.add_argument('-j', '--jumpAhead',
+                        help='The # of seconds to jump ahead in the skimming mode.', default='ignore')
+    parser.add_argument('-o', '--offsetTime',
+                        help='The msec that the video is behind the gaze timestamp.', default='ignore')
+    parser.add_argument('-c', '--colorPlane',
+                        help='The color plan to use for matching.',
+                        choices=['ALL', 'R', 'G', 'B'],
+                        default='ALL')
+    parser.add_argument('-v', '--videoPlayback',
+                        help='Whether to play the video or process silently.',
+                        choices=['T', 'F'],
+                        default='T')
+    parser.add_argument('-y', '--YAMLFile',
+                        default = 'default.yaml',
+                        help='Name of the YAML configuration file.')
+    args = parser.parse_args()
+
+    #################################
+    # now process the args
+    #################################
+    showVideo = True if (args.videoPlayback is "T") else False
+
+    yamlfile = args.YAMLFile
     yamlconfig = yaml.load(open(yamlfile))
     assert "tasks" in yamlconfig
     assert "study" in yamlconfig
-    #assert "Assessment" in yamlconfig["tasks"]
-    #assert "items" in yamlconfig["tasks"]["Assessment"]
 
     # ORC engine
     tess = TessEngine()
@@ -891,55 +898,72 @@ if __name__ == "__main__":
     frameEngine.matchTemplateThreshold=float(yamlconfig["study"]["matchTemplateThreshold"])
 
     # init global vars
-    startFrame= yamlconfig["study"]["startFrame"]
+    startFrame= yamlconfig["study"]["startFrame"] if "startFrame" in yamlconfig["study"] else 0
+    if args.startFrame is not 'ignore': 
+        try:
+            startFrame = int(args.startFrame)
+        except:
+            print "Error: -s {} is invalid".format(args.startFrame)
+            exit(-1)
+
     # for skimmingMode, # of seconds to jump ahead
-    if "jumpAhead" in yamlconfig["study"]:
-        jumpAhead = yamlconfig["study"]["jumpAhead"]
-    else:
-        jumpAhead = 0.5
+    jumpAhead = yamlconfig["study"]["jumpAhead"] if "jumpAhead" in yamlconfig["study"] else 0.5
+    if args.jumpAhead is not 'ignore': 
+        try:
+            jumpAhead = float(args.jumpAhead)
+        except:
+            print "Error: -j {} is invalid".format(args.jumpAhead)
+            exit(-1)
 
     # this is the async estimated by looking at video mouse movement and 
     #  cursor display based on the data from the mouse event log
     # quick hack, should be estimated automatically using template matching
-    if "videogazeoffset" in yamlconfig["study"]:
-        toffset = yamlconfig["study"]["videogazeoffset"]
-    else:
-        toffset = -600
-    #forcedCalc=False
-    #lastFrame=None
-    #diffFrame=None
-    #tmp=None; match=None; #tmp_old=None
-    #halfFrame=None
-    #halfImage=None
-    #minLoc = None
-    #minVal = None
-    #taskSigLoc=None
-    #txtBitmap=None
-    #txtScrollImage=None
-    txt=""
-    #video=None
-
-    frame=None
-    vTime=0
-    gaze=None
-    gazex=0; gazey=0;
-    skimmingMode=False
-    #signatureImageDict=[]
+    toffset = yamlconfig["study"]["videogazeoffset"] if "videogazeoffset" in yamlconfig["study"] else -600
+    if args.offsetTime is not 'ignore': 
+        try:
+            toffset = int(args.offsetTime)
+        except:
+            print "Error: -o {} is invalid".format(args.offsetTime)
+            exit(-1)
     
+    # log level is INFO unless otherwise specified
+    logLevel= logging.DEBUG if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"] else logging.INFO
+    #print "LogLevel: {} is 'DEBUG'? {}".format(args.logLevel, args.logLevel == 'DEBUG')
+    if args.logLevel == 'DEBUG': 
+        logLevel= logging.DEBUG
+        
+    #print "Loglevel: INFO={} DEBUG={}; current setting is {}={}".format(logging.INFO, logging.DEBUG, args.logLevel, logLevel)
+    print "INFO: startFrame: {}; jumpAhead={}; tOffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
+    # exit(0)
 
-    #logging.info("VideoFilePattern = "+str(v))
-    videoFileList = glob.glob(v)
-    #logging.info("VideoFileList = "+str(videoFileList))
 
-    # process videos
-    for vf in videoFileList:
-        #logging.info("Processing video = "+str(v))
+    skimmingMode=False
+
+    #################################
+    # Iterate through given files
+    #################################
+    for vf in args.avifiles:
         processVideo(vf)
-                
+
+    #################################
     # done
+    #################################
     if showVideo: cv2.destroyAllWindows()
     #logging.info("End")
     logging.shutdown()
     print "end processing"
 
-    # sys.exit(0)
+if __name__ == "__main__":
+
+    ##########################
+    # global/main:
+    ###########################################################
+
+    # txt=""
+    # frame=None
+    # vTime=0
+    # gaze=None
+    # gazex=0; gazey=0;
+    
+    
+    main()
