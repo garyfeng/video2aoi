@@ -15,6 +15,7 @@ from __future__ import print_function, unicode_literals, with_statement
 #import numpy
 import argparse
 import os
+import glob 
 from itertools import groupby
 from operator import itemgetter
 import re
@@ -76,7 +77,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
         #if not matchObj: 
           # the subjname (code) matches, now read
         tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        print ("Subject {} code {} dimensions {}".format(session_id, 
+        print ("HDF={} Subject={} code={} dimensions={}".format(hdf5_filename, session_id, 
                               subject_code_dict[session_id], str(tmp.shape)))
 
         if valid_rows is None:
@@ -153,9 +154,6 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
         #if not matchObj: 
           # the subjname (code) matches, now read
         tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        print ("Subject {} code {} dimensions {}".format(session_id, 
-                              subject_code_dict[session_id], str(tmp.shape)))
-
         if valid_rows is None:
           valid_rows = tmp
         else:
@@ -210,9 +208,6 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
         #if not matchObj: 
           # the subjname (code) matches, now read
         tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        print ("Subject {} code {} dimensions {}".format(session_id, 
-                              subject_code_dict[session_id], str(tmp.shape)))
-
         if valid_rows is None:
           valid_rows = tmp
         else:
@@ -268,7 +263,8 @@ def main():
         conflict_handler='resolve')
     parser.add_argument('hdf5_file',
                         help='The HDF5 data file to extract gaze positions ' +
-                             'from.', nargs='+')
+                             'from. This can be a glob pattern, e.g., "event*.hdf5".' +
+                             'And you can do "study1*.hdf5+expt2*.hdf5".', nargs='+')
     parser.add_argument('-e', '--eye',
                         help='The eye whose position we want gazes for.',
                         choices=['left', 'right'],
@@ -294,7 +290,8 @@ def main():
 
     # Iterate through given files
     for hdf5_filename in args.hdf5_file:
-        hdf5_to_eye_log(hdf5_filename, eye=args.eye, experiment=args.experiment,
+      for h in glob.glob(hdf5_filename):
+        hdf5_to_eye_log(h, eye=args.eye, experiment=args.experiment,
                         subject=args.subject, 
                         origin = args.origin, 
                         monitor_size=args.monitor_size)
