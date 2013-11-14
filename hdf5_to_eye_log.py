@@ -8,11 +8,11 @@ Extract gaze positions from HDF5 file for use with v2.py or create_subtitle.py
 
 Gary Feng, Nov 2013:
 - exporting keystroke and mouse data
+- using regex for subject and hdf5 selection
 '''
 
 from __future__ import print_function, unicode_literals, with_statement
 
-#import numpy
 import argparse
 import os
 import glob 
@@ -22,6 +22,53 @@ import re
 import numpy as np
 
 import tables
+
+def readDataTable(table, subject, filter_string, subject_code_dict):
+  '''Read rows of data from the *table* and filter with *subject* and *experiment*.
+  :param table: the HDF5 data table 
+  :param subject: the regex string to filter by subject name (aka 'code' in iohub)
+  :param filter_string: used to select the data in addition to subject
+  :param subject_code_dict: a dict built from the HDF5 tables to convert session_id to code
+  :Returns: numpy 1-D array -- data read; or None if no subject or data 
+  '''
+
+  # Do query, all gaze, including missing or invalid gaze
+  # this is necessary if later we want to know the % of missing data
+  valid_rows=None
+  # need to filter according to subject
+  if subject is not None:
+    # get the matching subjs
+    matchedSubjects = [s for s in subject_code_dict if re.match( subject, subject_code_dict[s], re.I)]
+    if len(matchedSubjects)<1:
+      # no matching subjects; quit this file
+      return None
+    for session_id in matchedSubjects:
+      # this is an ugly hack to filter by subject_code but it's quick
+      # skip the subject if subject pattern is specified but doesn't match this one
+      # assume it's a regex pattern
+      #matchObj = re.match( subject, subject_code_dict[session_id], re.I)
+      #if not matchObj: 
+        # the subjname (code) matches, now read
+      tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
+      #print ("HDF={} Subject={} code={} dimensions={}".format(hdf5_filename, session_id, 
+      #                      subject_code_dict[session_id], str(tmp.shape)))
+
+      if valid_rows is None:
+        valid_rows = tmp
+      else:
+        #valid_rows = np.column_stack((valid_rows, tmp ))
+        valid_rows=np.append(valid_rows,tmp) 
+    # now we have all the subjects, we sort
+    valid_rows = sorted(valid_rows, key=itemgetter('experiment_id',
+                                                                     'session_id',
+                                                                     'time'))
+  else:
+    # if subject is not specified
+    valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
+                                                                     'session_id',
+                                                                     'time'))
+  # return the data table
+  return valid_rows if len(valid_rows)>0 else None
 
 def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                     output_directory='.', origin='center', monitor_size='1920x1280'):
@@ -41,6 +88,8 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     except:
       print("Error: monitor_size paramter '{}' cannot be parsed.".format(monitor_size))
       return False
+    
+    print ("\nProcessing hdf5 file {}".format(hdf5_filename))
 
     # Build handy dictionaries
     code_subject_dict = dict([(row['code'], row['session_id']) for row in
@@ -55,45 +104,16 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
 
     # Build filter string
     filter_string = '(experiment_id > 0)'
-    #if subject is not None:
-    #    filter_string += ' & (session_id == {0})'.format(code_subject_dict[subject])
     if experiment is not None:
         filter_string += ' & (experiment_id == {0})'.format(code_experiment_dict[experiment])
 
+    ###############################
     # get the eyegaze table first
+    ###############################
     table = h5file.root.data_collection.events.eyetracker.BinocularEyeSampleEvent
     # Do query, all gaze, including missing or invalid gaze
     # this is necessary if later we want to know the % of missing data
-    valid_rows=None
-    # need to filter according to subject
-    if subject is not None:
-      # get the matching subjs
-      matchedSubjects = [s for s in subject_code_dict if re.match( subject, subject_code_dict[s], re.I)]
-      for session_id in matchedSubjects:
-        # this is an ugly hack to filter by subject_code but it's quick
-        # skip the subject if subject pattern is specified but doesn't match this one
-        # assume it's a regex pattern
-        #matchObj = re.match( subject, subject_code_dict[session_id], re.I)
-        #if not matchObj: 
-          # the subjname (code) matches, now read
-        tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        print ("HDF={} Subject={} code={} dimensions={}".format(hdf5_filename, session_id, 
-                              subject_code_dict[session_id], str(tmp.shape)))
-
-        if valid_rows is None:
-          valid_rows = tmp
-        else:
-          #valid_rows = np.column_stack((valid_rows, tmp ))
-          valid_rows=np.append(valid_rows,tmp) 
-      # now we have all the subjects, we sort
-      valid_rows = sorted(valid_rows, key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
-    else:
-      # if subject is not specified
-      valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
+    valid_rows=readDataTable(table, subject, filter_string, subject_code_dict)
 
     # Proceed if we got anything
     if valid_rows:
@@ -103,8 +123,9 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             with open(os.path.join(output_directory, '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'w') as subject_log:
                 gotFirstGaze = False
-
+                c=0
                 for row in group_iter:
+
                     # skip all junk gaze data until the first valid sample
                     if not gotFirstGaze and row['status'] != 0:
                       # skip
@@ -112,10 +133,9 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                     elif not gotFirstGaze and row['status'] == 0:
                       # first gaze reading
                       startTime[session_id] = int(round(row['time']*1000))
-                      print ('Now processing: {0}_eye.txt, startTime = {1}'.format(subject_code_dict[session_id], startTime[session_id]))
-                      #print (str(startTime))
                       gotFirstGaze=True 
-                      
+                    
+                    c+=1
                     # not first gaze; subtract the known startTime
                     st=startTime[session_id] 
                     # export missing values if the status !=0
@@ -134,40 +154,15 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                                 gazey,
                                                 row["event_id"]),
                                           file=subject_log)
+            print ('Gaze: {} gaze events saved to {}_eye.txt, startTime = {}'.format(c, subject_code_dict[session_id], startTime[session_id]))
             subject_log.close()
 
+    ###############################
     # get the keystroke table 
+    ###############################
     table = h5file.root.data_collection.events.keyboard.KeyboardCharEvent
     # Do query, using the same filter
-    # Do query, all gaze, including missing or invalid gaze
-    # this is necessary if later we want to know the % of missing data
-    valid_rows=None
-    # need to filter according to subject
-    if subject is not None:
-      # get the matching subjs
-      matchedSubjects = [s for s in subject_code_dict if re.match( subject, subject_code_dict[s], re.I)]
-      for session_id in matchedSubjects:
-        # this is an ugly hack to filter by subject_code but it's quick
-        # skip the subject if subject pattern is specified but doesn't match this one
-        # assume it's a regex pattern
-        #matchObj = re.match( subject, subject_code_dict[session_id], re.I)
-        #if not matchObj: 
-          # the subjname (code) matches, now read
-        tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        if valid_rows is None:
-          valid_rows = tmp
-        else:
-          #valid_rows = np.column_stack((valid_rows, tmp ))
-          valid_rows=np.append(valid_rows,tmp) 
-      # now we have all the subjects, we sort
-      valid_rows = sorted(valid_rows, key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
-    else:
-      # if subject is not specified
-      valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
+    valid_rows=readDataTable(table, subject, filter_string, subject_code_dict)
     # Proceed if we got anything
     if valid_rows:
         # Print all valid gaze data for given eye
@@ -176,8 +171,10 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
             with open(os.path.join(output_directory, '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'a') as subject_log:
               try:
+                c=0
                 st=startTime[session_id] 
                 for row in group_iter:
+                    c+=1
                     if round(row['time']*1000)>st:
                         print('{0:d}\t{1}\t{2}\t{3}\t{4}'.format( int(round(row['time']*1000)-st),
                                                   "keyboard",
@@ -185,43 +182,18 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                                   "",
                                                   row['key']),
                           file=subject_log)
-                print ('Keyboard: key events saved to {0}_eye.txt '.format(subject_code_dict[session_id]))
+                print ('Keyboard: {} key events saved to {}_eye.txt '.format(c, subject_code_dict[session_id]))
               except:
                 print ('Error: keyboard events cannot be saved to {0}_eye.txt '.format(subject_code_dict[session_id]))
             subject_log.close()
 
+    ###############################
     # get the mouse table 
+    ###############################
     table = h5file.root.data_collection.events.mouse.MouseInputEvent
     # Do query
-    # Do query, all gaze, including missing or invalid gaze
-    # this is necessary if later we want to know the % of missing data
-    valid_rows=None
-    # need to filter according to subject
-    if subject is not None:
-      # get the matching subjs
-      matchedSubjects = [s for s in subject_code_dict if re.match( subject, subject_code_dict[s], re.I)]
-      for session_id in matchedSubjects:
-        # this is an ugly hack to filter by subject_code but it's quick
-        # skip the subject if subject pattern is specified but doesn't match this one
-        # assume it's a regex pattern
-        #matchObj = re.match( subject, subject_code_dict[session_id], re.I)
-        #if not matchObj: 
-          # the subjname (code) matches, now read
-        tmp = table.readWhere(filter_string+' & (session_id == {0})'.format(session_id))
-        if valid_rows is None:
-          valid_rows = tmp
-        else:
-          #valid_rows = np.column_stack((valid_rows, tmp ))
-          valid_rows=np.append(valid_rows,tmp) 
-      # now we have all the subjects, we sort
-      valid_rows = sorted(valid_rows, key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
-    else:
-      # if subject is not specified
-      valid_rows = sorted(table.readWhere(filter_string), key=itemgetter('experiment_id',
-                                                                       'session_id',
-                                                                       'time'))
+    valid_rows=readDataTable(table, subject, filter_string, subject_code_dict)
+
     # Proceed if we got anything
     if valid_rows:
         # Print all valid gaze data for given eye
@@ -231,7 +203,9 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                    '{0}_eye.txt'.format(subject_code_dict[session_id])),
                       'a') as subject_log:
               try:
+                c=0
                 for row in group_iter:
+                    c+=1
                     st=startTime[session_id] 
                     mousex = int(round(row["x_position"]))
                     mousey = int(round(row["y_position"]))
@@ -245,12 +219,14 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
                                                   mousey,
                                                   row['pressed_buttons']),
                           file=subject_log)
-                print ('Mouse: mouse events saved to {0}_eye.txt '.format(subject_code_dict[session_id]))
+                print ('Mouse: {} mouse events saved to {}_eye.txt '.format(c, subject_code_dict[session_id]))
               except:
                 print ('Error: mouse events cannot be saved to {0}_eye.txt '.format(subject_code_dict[session_id]))
             subject_log.close()
 
+    ###############################
     # close HDF5 file
+    ###############################
     h5file.close()
 
 def main():
