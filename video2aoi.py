@@ -943,7 +943,8 @@ def main():
     # Iterate through given files
     #################################
     for vf in args.avifiles:
-        processVideo(vf)
+        for f in glob.glob(vf):
+            processVideo(f)
 
     #################################
     # done
