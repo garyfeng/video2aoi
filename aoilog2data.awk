@@ -6,7 +6,9 @@ BEGIN {
 	page = ""
 	aoi=""
 	content =""
-	toffset = 1500
+	# vt now is back-calcualted from gzt taking into account of the toffset
+	# no need to do this anymore
+	toffset = 0
 }
 
 /Scaling ratio/ {
@@ -15,29 +17,29 @@ BEGIN {
 	gsub(/\.avi/, "", subj)	#cbalm08
 }
 
-/\tGaze\t/{
-	#INFO	44480	Gaze	vt=615879	gzt=614579	x=784	y=438	info=1031	aoi=Assessment/items/MSTITLE	MSTITLEPARTII	MSTITLEPARTII	657	397	1068	461
+/gaze:/{
+	#INFO	41315	gaze:	vt=77104	gzt=75604	x=936	y=696	info=4197	aoi=Assessment/items/Task4Intro/IntroDirections	IntroDirections	IntroDirections	569	502	1351	726
 	# header
 	# subj	event	t	x	y	sampleNum	page	aoi	content	x1	y1	x2	y2
-	t=$7 + toffset
+	t=$5 + toffset
 	page = $15
 	aoi = $16
 	content = $17
 	print subj, "g", t, $9, $11, $13, $15, $16, $17, $18, $19, $20, $21
 }
 
-/Keystroke:/ {
+/keyboard:/ {
 	# INFO	397465	Keystroke: vt=992000.0	gzt=990297	x=	y=	key=s
 	# note the space after MOuse:, it's a bug that is fixed in teh next version; should have been \t
 	# this will change the parsing
-	t=$6+toffset
-	print subj, "k", t, "", "", "", page, "", $12, "", "", "", ""
+	t=$5+toffset
+	print subj, "k", t, "", "", "", page, "", $13, "", "", "", ""
 }
 
-/Mouse:/ {
-#logging.info("Mouse: vt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
+/mouse:/ {
+#logging.info("Mouse:\tvt="+str(vTime)+"\tgzt="+str(mousetime)+"\tx="+str(mousex)+"\ty="+str(mousey)+"\tkey="+str(i["info"]))
 	# note the space after MOuse:, it's a bug that is fixed in teh next version; should have been \t
 	# this will change the parsing
-	t=$6+toffset
-	print subj, "m", t, $8, $9, $10, page, "", $10, "", "", "", ""
+	t=$5+toffset
+	print subj, "m", t, $9, $10, $11, page, "", $11, "", "", "", ""
 }
