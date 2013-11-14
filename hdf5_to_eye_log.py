@@ -71,10 +71,19 @@ def readDataTable(table, subject, filter_string, subject_code_dict):
   return valid_rows if len(valid_rows)>0 else None
 
 def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
-                    output_directory='.', origin='center', monitor_size='1920x1280'):
+                    output_directory='.', origin='center', monitor_size='1920x1080'):
     '''
     Takes an HDF5 file and creates eye logs for each subject and experiment in
     file or filters on subject and/or experiment if specified.
+
+    :param hdf5_filename: the file name of the hdf5 file
+    :param eye: default to 'left'
+    :param subject: regex pattern for the subjects (in iohub terminology, the 'code') to extract
+    :param experiment: default to 0
+    :param output_directory: default to '.'
+    :param origin: 'topleft' or 'center' (default) depending on the version of iohub. 
+    :param monitor_size: the size of the screen iohub used; default to '1920x1080'
+    :returns: True if all goes well; False if the file doesn't exist
     '''
     # Read in tables
     try:
@@ -228,6 +237,7 @@ def hdf5_to_eye_log(hdf5_filename, eye='left', subject=None, experiment=None,
     # close HDF5 file
     ###############################
     h5file.close()
+    return True
 
 def main():
     ''' Main function that processes arguments and gets things started. '''
