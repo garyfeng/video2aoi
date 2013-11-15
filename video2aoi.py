@@ -693,6 +693,11 @@ def processVideo(v):
 
         # read in alldata
         alldata = readEventData(basename)
+        if not alldata:
+            # no data read
+            logging.error("processGazeLog: error reading eye gaze data for {}. Skipping this file".format(basename))
+            print "processGazeLog: error reading eye gaze data for {}. Skipping this file".format(basename)
+            return False
 
         gaze = alldata[np.where(alldata.event=="gaze")]
         print "processGazeLog: gaze data len = "+str(len(gaze))
