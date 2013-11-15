@@ -1,3 +1,12 @@
+# Gary Feng, 2013
+# copyleft
+
+# this script reads the *AOI.log file and prints out 
+# format: Subj, keycounter, tLastKey, tCurrKey, prevIKI, keycode, AOI_name, timeOnAOI, %TimeOnAOI
+# note that the timeOnAOI may be longer than the prevIKI, because the key presses may happen in between 
+#    gaze samples, and sometimes the gaze samples don't come in regular times (particularly for Tobii).
+# but overall these should be very close
+
 BEGIN {
     start=0
     FS="[=\t]"
@@ -24,6 +33,7 @@ BEGIN {
 
 function init() {
 	# initialize the array
+	# commented code reserved to limit the # of AOIs 
 	for (i in aoilist) delete aoilist[i]
 	# aoilist["Task4AdLeft"]=0
 	# aoilist["Task4Checklist"]=0
@@ -83,14 +93,12 @@ function init() {
 }
 
 /keyboard:/ {
-	# INFO	397465	Keystroke: vt=992000.0	gzt=990297	x=	y=	key=s
-	# note the space after MOuse:, it's a bug that is fixed in teh next version; should have been \t
-	# this will change the parsing
+	# INFO	397465	Keystroke:	vt=992000.0	gzt=990297	x=	y=	key=s
 
 	t=$5
 	#lead = sprintf ("%s\t%s\t%d\t%d\t%d\t%d\t%s", subj, page, ++counter, stime, t, t-stime, $13)
 	# page is useless because we have the unique aoi
-	# format: Subj, keycounter, tLastKey, tCurrKey, prevIKI, keycode, AOI_counters 
+	# format: Subj, keycounter, tLastKey, tCurrKey, prevIKI, keycode, AOI_name, timeOnAOI, %TimeOnAOI
 	lead = sprintf ("%s\t%d\t%d\t%d\t%d\t%s", subj, ++counter, stime, t, t-stime, $13)
 
 	# calc the total aoi time to print % for each aoi
@@ -102,7 +110,7 @@ function init() {
 	for (i=1; i<=n; i++) {
 		if (totaltime ==0) aoiTimePrcnt="1.000"
 		else aoiTimePrcnt = sprintf("%04.3f", aoilist[ind[i]]/totaltime)
-		if(stime > 0) print lead, "AOI", ind[i], aoilist[ind[i]], aoiTimePrcnt
+		if(stime > 0) print lead, ind[i], aoilist[ind[i]], aoiTimePrcnt
 	}
 	#for (a in aoilist) print "AOI", a, aoilist[a]
 
