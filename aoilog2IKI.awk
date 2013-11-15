@@ -53,7 +53,7 @@ function init() {
 	# aoilist["Task4WorriesLeft"]=0
 	# aoilist["Task4TipsRight"]=0
 	# aoilist["Assessment"]=0
-	aoilist["MISSING"]=0
+	# aoilist["MISSING"]=0
 	# aoilist["JUNK"]=0
 }
 
@@ -104,6 +104,8 @@ function init() {
 	# calc the total aoi time to print % for each aoi
 	totaltime = 0
 	for (a in aoilist) totaltime += aoilist[a]
+	# make sure aoilist is not completely empty, or else you don't have an output
+	if (totaltime==0) aoilist["MISSING"]=0
 
 	# print sorted
 	n=asorti(aoilist, ind)
