@@ -70,6 +70,7 @@ def ssa_for_eye_log(eye_log, width=GetSystemMetrics(0),
             first = False
 
 
+
 def main():
     ''' Main function that processes arguments and gets things started. '''
     # Get command line arguments
