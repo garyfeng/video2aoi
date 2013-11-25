@@ -18,7 +18,7 @@ from win32api import GetSystemMetrics
 
 def ssa_for_eye_log(eye_log, width=GetSystemMetrics(0),
                     height=GetSystemMetrics(1), eye_num=0,
-                    output_filename='-'):
+                    output_filename='-', sync=0):
     '''
     Creates a file containing the SSA-subtitle-version of the eye tracking data
     in eye_log.
@@ -44,7 +44,8 @@ def ssa_for_eye_log(eye_log, width=GetSystemMetrics(0),
 
         # Print eye gaze data
         prev_time = timedelta(0)
-        time_offset = timedelta(0)
+        # gary feng: added parameter to allow for correcting video-gaze asynchrony
+        time_offset = timedelta(0) + sync
         first = True
         for line in eye_log:
             line = line.decode('utf-8').strip()
@@ -87,11 +88,14 @@ def main():
     parser.add_argument('-w', '--width',
                         help="Width of the screen log is for.", type=int,
                         default=GetSystemMetrics(0))
+    parser.add_argument('-s', '--sync',
+                        help="Offset to sync video with gaze data", type=int,
+                        default=0)
     args = parser.parse_args()
 
     for eye_num, eye_log in enumerate(args.eye_log):
         ssa_for_eye_log(eye_log, width=args.width, height=args.height,
-                        eye_num=eye_num)
+                        eye_num=eye_num, sync = args.sync)
 
 
 if __name__ == '__main__':

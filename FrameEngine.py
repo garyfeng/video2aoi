@@ -16,6 +16,9 @@ import logging
 #import re
 #import subprocess
 
+# gary feng
+# doesn't work with frameChanged() or findMatch()
+# from numba import autojit
 
 # class for video comparisons
 class FrameEngine:
@@ -104,7 +107,7 @@ class FrameEngine:
         # desktop: a lot of gray
         if (hist[1][0]==255): return True
         else: return False
-            
+   
     def frameChanged (self, vframe, channel = 99):
         '''Compare the current frame to the last frame and return a boolean.
         The diff between the vframe and last vframe is compared to frameChangeThreshold.
@@ -268,7 +271,6 @@ class FrameEngine:
         # offset, match, txtScrollImage
         return ((int(round(H[0,2])), int(round(H[1,2]))), (np.sum(status), len(status)))
 
-            
     def findMatch (self, image, template, threshold=-99):
         '''find template in image; return (location, minV) if found, or None is not found'''
         minV,maxV,minL ,maxL = None, None, None, None
