@@ -296,7 +296,7 @@ signatureImageDict={}
 def p2ReadSignatureImage(k, value, c):
     '''Takes a key, a value (file name), and a context, and reads the image if key="match" or "track"
     then updates the global dict signatureImageDict'''
-    global signatureImageDict
+    global signatureImageDict, yamlconfig
     
     if not isinstance(value, dict):
         # not a dict, no need to process
@@ -364,6 +364,17 @@ def p2ReadSignatureImage(k, value, c):
         # full color
         pass
 
+    # now store the img into a dict, indexed by 
+    # @@@ fname for now; it should be by the ITEM/AOI name, which shoud be unique, 
+    #   because the fname is arbitrary and may be reused for different AOI definitions.
+    # the dict will include the following info:
+    #   - item/aoi name, i.e., the entry in YAML that has a child node "match"
+    #   - fname, sourceLoc if necessary
+    #   - colorPlane
+    #   - destRange: this should be parsed only once, not per frame
+    #   - lastKnownImg: None at the begining; set at the first match
+    #   - template(s): a list of templates, specified 
+    #   - lastKnownPosition: these will be set to None first but 
     signatureImageDict[fname]=img
     return True
                 
@@ -693,7 +704,7 @@ def processVideo(v):
 
         # read in alldata
         alldata = readEventData(basename)
-        if not alldata:
+        if  alldata is None:
             # no data read
             logging.error("processGazeLog: error reading eye gaze data for {}. Skipping this file".format(basename))
             print "processGazeLog: error reading eye gaze data for {}. Skipping this file".format(basename)
@@ -885,7 +896,11 @@ def main():
     showVideo = True if (args.videoPlayback is "T") else False
 
     yamlfile = args.YAMLFile
-    yamlconfig = yaml.load(open(yamlfile))
+    try:
+        yamlconfig = yaml.load(open(yamlfile))
+    except:
+        print "Error with the YAML file: {} cannot be opened.".format(yamlfile)
+        exit(-1)
     assert "tasks" in yamlconfig
     assert "study" in yamlconfig
 
