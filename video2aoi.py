@@ -40,25 +40,45 @@ def updateAOI (data):
 
     aoilist.append(data)
 
-def findLastMatchOffset():
-    ''' This function looks into the aoilist for the last aoi with id="__MATCH__".
-    If not found, it returns None. If found, it returns the coordinate of the upper left corner
+def findLastMatchOffset(context):
+    ''' This function parses the 'context' tree, looks into the aoilist for the last aoi with id="__MATCH__".
+    If not found, it returns None. If found, it returns the coordinate of the upper left corner.
+
+    context is a list. 
     '''
     global aoilist
 
+    if context is None: 
+        logging.debug("findLastMatchOffset: input context = '{}' is None".format(str(context)))
+        return None
+    if not isinstance(context, list): 
+        logging.debug("findLastMatchOffset: input context = '{}' is not a list".format(str(context)))
+        return None
+
+    # reverse context; must make a copy, or else it messes up the context
+    c = context[:]  # can't do c=context, which simply makes a reference. 
+    c.reverse()
+
     offset=[-9999, -9999]
-    contextLen = 0
+    #contextLen = 0
 
     for d in aoilist:
         # look for the match with the longest context, which is the "deepest" match
-        if d[1] == "__MATCH__" and len(d[0]) > contextLen:
-            offset[0] = d[3]
-            offset[1] = d[4]
-            contextLen = len(d[0])
+        # if d[1] == "__MATCH__" and len(d[0]) > contextLen:
+        #     offset[0] = d[3]
+        #     offset[1] = d[4]
+        #     contextLen = len(d[0])
+        # look for the match with the longest context, which is the "deepest" match
+        print "findLastMatchOffset: input context = '{}' ".format(str(context))
+        for key in c:
+            if d[1] == "__MATCH__"+str(key):
+                offset[0] = d[3]
+                offset[1] = d[4]
+                break;
     # now done with searching, return None if nothing is found
-    if offset[0] == -9999: return None
+    #if offset[0] == -9999: return None
     # otherwise return the real deal
-    return offset
+    return None if offset[0] == -9999 else offset
 
 def getColorPlane():
     '''Returns the color plane code specified in the YAML file'''
@@ -123,7 +143,6 @@ def readEventData(basename):
         alldata = np.genfromtxt(datafilename, delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
     except:
         # no gaze file to read; fake one
-        print "processGazeLog: Error reading "+datafilename
         logging.error("processGazeLog: file "+datafilename+" cannot be read.")
         return None
         #alldata = np.genfromtxt("fake_events.txt", delimiter='\t', dtype=None, names=['t', 'event', 'x', 'y', 'info'])
@@ -154,6 +173,10 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
     # set gaze pos to missing, but not mouse pos
     gazex=-32768; gazey=-32768;
+
+    # debug: output AOIs
+    for a in aoilist:
+        logging.debug("logEvents: AOI = {}".format("\t".join([str(s) for s in a])))
  
     # the original algorithm only gets the last gaze sample 
     # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
@@ -178,12 +201,12 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
             x=-32768; y=-32768
 
         # you shouldn't have a case whereaoistring is undefined without the follow ling but it had occurred. 
-        aoistring = "SOMETHINGWRONG"+"\t\t\t\t\t\t"
-        currItem = ""
+        currItem = "NONAOI"
+        aoistring = currItem+"\t\t\t\t\t\t"
         for a in aoilist:
             #logging.debug("logEvents: aoi page = {}".format(a["page"]))
             # if the page title starts with Assessment/items, then this is the page, and we exit this loop
-            if a["page"].find("Assessment/items") ==0:
+            if a["page"].startswith("Assessment/items"):
                 currItem = a["page"]
                 logging.debug("logEvents: currItem = {}".format(currItem))
                 break
@@ -201,7 +224,8 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
             activeAOI=activeAOI[np.where(activeAOI.y2>y)]
             if len(activeAOI)>0:
                 for aoi in activeAOI:
-                    if not "__MATCH__" in aoi["id"]:
+                    #if not "__MATCH__" in aoi["id"]:
+                    if not aoi["id"].startswith("__MATCH__"):
                         # skip templates for template matching or tracking
                         aoistring="\t".join([str(s) for s in aoi])
             else:
@@ -242,7 +266,8 @@ def displayFrame(windowName):
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
         # if aoilist is not None:
         for d in aoilist:
-            if "__MATCH__" in d["id"]:
+            #if "__MATCH__" in d["id"]:
+            if d["id"].startswith("__MATCH__"):
                 # matching or tracking images
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,255,0), 2)
             else:
@@ -252,7 +277,8 @@ def displayFrame(windowName):
     # displays the AOI of the last matched object
     if len(aoilist)>0 and len(activeAOI)>0: 
         for d in activeAOI:
-            if not ("__MATCH__" in d["id"]):
+            #if not ("__MATCH__" in d["id"]):
+            if not d["id"].startswith("__MATCH__"):
                 # actual active AOIs
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
                 
@@ -502,7 +528,7 @@ def p2Task(k, value, context):
         coord[3]= h+ objoffset[1]
 
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-        updateAOI((str(fname), "__MATCH__", str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
 
     # if successful match or NO match needed
@@ -525,10 +551,11 @@ def p2Task(k, value, context):
         # something like: relativeAOI: 0, 0, 785, 573
         # 
         # first, find the latest __MATCH__ in the aoilist, and return the offset
-        objoffset = findLastMatchOffset()
+        # sending the context string, so that the function can parse and find the last match object
+        objoffset = findLastMatchOffset(context+[k])
         if objoffset is None:
             # error, most likely because there is no __MATCH__ in aoilist
-            logging.error("relativeAOI: Cannot find the last matched object. No AOI output")
+            logging.error("relativeAOI: Cannot find the last matched object '{}'. No AOI output".format(k))
             return None
 
         # read in the relative para
