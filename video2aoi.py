@@ -284,8 +284,8 @@ def displayFrame(windowName):
         # forcedCalc=True
     elif (key>0):
         # any other key saves a screenshot of the current frame
-        logging.info("GUI: key="+str(key)+"\tvideoFrame written to="+v+"_"+str(vTime)+".png"+txt)
-        cv2.imwrite(v+"_"+str(vTime)+".png", frame)
+        logging.info("GUI: key="+str(key)+"\tvideoFrame written to="+windowName+"_"+str(vTime)+".png"+txt)
+        cv2.imwrite(windowName+"_"+str(vTime)+".png", frame)
         print key
     else: pass
 
