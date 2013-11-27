@@ -69,7 +69,7 @@ def findLastMatchOffset(context):
         #     offset[1] = d[4]
         #     contextLen = len(d[0])
         # look for the match with the longest context, which is the "deepest" match
-        print "findLastMatchOffset: input context = '{}' ".format(str(context))
+        #print "findLastMatchOffset: input context = '{}' ".format(str(context))
         for key in c:
             if d[1] == "__MATCH__"+str(key):
                 offset[0] = d[3]

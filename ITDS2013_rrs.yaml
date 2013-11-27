@@ -76,7 +76,7 @@ study:
 
     # log level debug: turn this on if you want to get a LOT of info in the log
     # including frame by frame counts
-    logLevelDebug: True
+    logLevelDebug: False
 
 
 items: &assessmentItems
@@ -321,7 +321,7 @@ tasks:
         match: calcsig1.png, 0.03
         destRange: 0, 0, 1920, 1080
         #threshold: 0.01
-        relativeAOI: -27, -83, 260, 285
+        relativeAOI: -25, -100, 235, 295
         log: CalculatorToolActivated
     # NEXTITEMWARNING:
     #     # the warning sign that says you can't go back if you move on to the next item
