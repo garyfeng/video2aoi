@@ -686,7 +686,10 @@ def processVideo(v):
     #     logLevel= logging.DEBUG
     #logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(asctime)s\t%(message)s', level=logging.DEBUG)
     logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logLevel)
-    
+    if testMode:
+        # do not output to the log file
+        logging.disable(logging.INFO)
+
     print("OpenLogger "+logfilename)
     logging.info("\n\n======================================================")
 
@@ -885,7 +888,8 @@ def processVideo(v):
 
 def main():
     ''' Main function that processes arguments and gets things started. '''
-    global yamlconfig, tess, parser, frameEngine, startFrame, showVideo, jumpAhead, txt, toffset, skimmingMode, logLevel
+    global yamlconfig, tess, parser, frameEngine, startFrame, showVideo, jumpAhead
+    global txt, toffset, skimmingMode, logLevel, testMode
 
     # Get command line arguments
     parser = argparse.ArgumentParser(
@@ -915,6 +919,11 @@ def main():
     parser.add_argument('-y', '--YAMLFile',
                         default = 'default.yaml',
                         help='Name of the YAML configuration file.')
+    parser.add_argument('-t', '--testingMode',
+                        help='If true, no output; for testing only.',
+                        choices=['T', 'F'],
+                        default='F')
+
     args = parser.parse_args()
 
     #################################
@@ -978,7 +987,10 @@ def main():
     #print "LogLevel: {} is 'DEBUG'? {}".format(args.logLevel, args.logLevel == 'DEBUG')
     if args.logLevel == 'DEBUG': 
         logLevel= logging.DEBUG
-        
+    
+    # testmode
+    testMode = True if (args.testingMode is "T") else False
+
     #print "Loglevel: INFO={} DEBUG={}; current setting is {}={}".format(logging.INFO, logging.DEBUG, args.logLevel, logLevel)
     print "INFO: startFrame: {}; jumpAhead={}; tOffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
     # exit(0)

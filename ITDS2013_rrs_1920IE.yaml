@@ -76,7 +76,7 @@ study:
 
     # log level debug: turn this on if you want to get a LOT of info in the log
     # including frame by frame counts
-    logLevelDebug: True
+    logLevelDebug: False
 
 
 items: &assessmentItems
