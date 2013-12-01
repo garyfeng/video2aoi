@@ -69,7 +69,7 @@ study:
     # if True, will  read gaze/mouse log files; if False, will do video processing only
     processGazeLog: False
     gazeProcessingScript: "eyelog2dat_iohub.awk"
-    logFileSuffix: "_eye.log"
+    datalogFileSuffix: "_eye.log"
 
     # OCR output control
     ocrLogText: True

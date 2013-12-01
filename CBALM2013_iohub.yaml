@@ -64,7 +64,7 @@ study:
     processGazeLog: True
     dataFileSuffix: "_events.txt"
     gazeProcessingScript: "eyelog2dat_iohub.awk"
-    logFileSuffix: "_eye.log"
+    datalogFileSuffix: "_eye.log"
 
     # OCR output control
     ocrLogText: True

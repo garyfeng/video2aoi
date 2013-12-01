@@ -1,0 +1,92 @@
+# yaml for video2aoi.py
+# Gary Feng, 2013, Princeton, NJ
+
+# requires:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# aoi: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# break: specify this if you don't want to continue processing 
+#       the rest of **sibling** items 
+#       following the **successful** processing of the current entry
+#       doesn't matter if you specify True or False, so long as it appears
+
+# match: always followed by a image filename, followed by options:
+#       match: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#       sourceLoc: x, y, w, h, or x1, y1, x2, y2, depending on "aoiFormat" 
+#           this specifies the subimage that will be used as the signature. 
+#           and by default, match will first tries to do a image match at this location in the dest image
+#           if this fails, it will do an exhaustive template matching
+#       unmatchLog: string to log in the case of unmatch; use this carefully
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: ITDS_RRS_2013
+    startFrame: 1
+    scalingRatio: 0.5
+    # did a look at the distribution of frameChange in cbalm49.avi, and looks like 
+    # a value of 1 will get ~20 more check points than =3 but will surely catch 
+    # most false negatives. 
+    frameChangeThreshold: 0
+    # this the global parameter that can be fine-tuned
+    matchTemplateThreshold: 0.02
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: -1500 
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "ITDS_sig"
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: False
+    dataFileSuffix: "_eye.txt"
+    gazeProcessingScript: "eyelog2dat_iohub.awk"
+    datalogFileSuffix: "_eye.log"
+
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+
+    # Show AOIs on the video?
+    displayAOI: True
+
+    # output log file
+    outputLogFileSuffix: "_AOI.log"
+    # log level debug: turn this on if you want to get a LOT of info in the log
+    # including frame by frame counts
+    logLevelDebug: False
+
+
+
+
+tasks:
+    Mouse:
+        match: mouse1.png, 0.02
+        destRange: 0, 0, 1920, 1080
+        #threshold: 0.2
+        relativeAOI: 0,0, 10, 10
+        #log: mouseFound

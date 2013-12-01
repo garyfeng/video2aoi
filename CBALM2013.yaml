@@ -69,7 +69,7 @@ study:
     # if True, will  read gaze/mouse log files; if False, will do video processing only
     processGazeLog: False
     # gazeProcessingScript: "eyelog2dat_Tobii.awk"
-    # logFileSuffix: "-All-Data.tsv"
+    # datalogFileSuffix: "-All-Data.tsv"
 
     # OCR output control
     ocrLogText: True
