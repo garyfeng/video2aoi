@@ -2,7 +2,7 @@ import cv2
 import cv2.cv as cv
 import os
 import os.path
-import sys
+#import sys
 import numpy as np
 import glob
 import logging
@@ -117,8 +117,8 @@ def readEventData(basename):
         os.remove(datafilename)
     if not os.access(datafilename, os.R_OK):
         # getting ready the process the *eye_log file to generate the datafile
-        if "logFileSuffix" in yamlconfig["study"].keys():
-            datalogfilename = basename + yamlconfig["study"]["logFileSuffix"]
+        if "datalogFileSuffix" in yamlconfig["study"].keys():
+            datalogfilename = basename + yamlconfig["study"]["datalogFileSuffix"]
         else:
             datalogfilename = basename + "_eye.log"; #default
         print('processGazeLog: Eyelog2Dat: %s file is not present' % datafilename)
@@ -665,7 +665,7 @@ def processVideo(v):
 
     '''
 
-    global yamlconfig, gaze, aoilist, toffset, logLevel
+    global yamlconfig, gaze, aoilist, toffset, logLevel, outputLogFileSuffix
     global video, frame,  startFrame #, minVal, taskSigLoc,
     global txt, vTime, jumpAhead, skimmingMode
     global gazex, gazey, mousex, mousey, activeAOI
@@ -680,17 +680,23 @@ def processVideo(v):
         ratio = 1
     
     # create new log for the file v
-    logfilename = os.getcwd()+"\\"+str(v)+"_AOI.log"
-    #logLevel = logging.INFO
-    # if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"]:
-    #     logLevel= logging.DEBUG
-    #logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(asctime)s\t%(message)s', level=logging.DEBUG)
+    basename = os.path.basename(os.path.splitext(v)[0])
+
+    try:
+        logfilename = basename+outputLogFileSuffix
+    except:
+        logfilename = basename+"_AOI.log"
+
+    logfilename = os.path.join(os.getcwd(), logfilename)
+
     logging.basicConfig(filename=logfilename, format='%(levelname)s\t%(relativeCreated)d\t%(message)s', level=logLevel)
+    # nothing will be written for testMode. It will create a new file with zero byte, though. 
     if testMode:
-        # do not output to the log file
+        print("program running in testMode; no data saved to {}".format(logfilename))
         logging.disable(logging.INFO)
 
-    print("OpenLogger "+logfilename)
+    if not testMode: 
+        print("OpenLogger "+logfilename)
     logging.info("\n\n======================================================")
 
     # close all windows, then open this one
@@ -721,7 +727,6 @@ def processVideo(v):
     p2YAML(yamlconfig["tasks"], p2ReadSignatureImage)
     
     # read eye event logs, only if doNotProcessGazeLog=False or unspecified
-    basename = os.path.basename(os.path.splitext(v)[0])
     processGazeLog = True
 
     gaze=None; 
@@ -889,7 +894,7 @@ def processVideo(v):
 def main():
     ''' Main function that processes arguments and gets things started. '''
     global yamlconfig, tess, parser, frameEngine, startFrame, showVideo, jumpAhead
-    global txt, toffset, skimmingMode, logLevel, testMode
+    global txt, toffset, skimmingMode, logLevel, testMode, outputLogFileSuffix
 
     # Get command line arguments
     parser = argparse.ArgumentParser(
@@ -902,7 +907,7 @@ def main():
                         help='The level of informatin to be logged.',
                         choices=['INFO', 'DEBUG'],
                         default='INFO')
-    parser.add_argument('-s', '--startFrame',
+    parser.add_argument('-f', '--startFrame',
                         help='The frame number to start processing.', default='ignore')
     parser.add_argument('-j', '--jumpAhead',
                         help='The # of seconds to jump ahead in the skimming mode.', default='ignore')
@@ -923,7 +928,9 @@ def main():
                         help='If true, no output; for testing only.',
                         choices=['T', 'F'],
                         default='F')
-
+    parser.add_argument('-s', '--outputLogFileSuffix',
+                        help='Suffix for the output log file.',
+                        default='ignore')
     args = parser.parse_args()
 
     #################################
@@ -982,6 +989,13 @@ def main():
             print "Error: -o {} is invalid".format(args.offsetTime)
             exit(-1)
     
+    # logfilename
+    outputLogFileSuffix = yamlconfig["study"]["outputLogFileSuffix"] if "outputLogFileSuffix" in yamlconfig["study"] else "_AOI.log"
+    if args.outputLogFileSuffix is not 'ignore':
+        outputLogFileSuffix = args.outputLogFileSuffix
+
+    print("outputLogFileSuffix = {}".format(outputLogFileSuffix))
+
     # log level is INFO unless otherwise specified
     logLevel= logging.DEBUG if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"] else logging.INFO
     #print "LogLevel: {} is 'DEBUG'? {}".format(args.logLevel, args.logLevel == 'DEBUG')
