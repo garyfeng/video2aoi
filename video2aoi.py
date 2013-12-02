@@ -40,6 +40,22 @@ def updateAOI (data):
 
     aoilist.append(data)
 
+def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 17):
+    '''Given the mouseLog (in numpy array) and videoMouseLocations (a numpy array) that contains
+    some fractions of mouse locations found in the video frames via template matching, find the 
+    most likely time shift parameter. None if no offset parameter can be found. 
+
+    locationThreshold is the parameter for difference in x,y locations between the mouseLog and 
+    videoMouseLocations; default is 2 pixels in either x or y.
+
+    temporalThreshold is the parameter for the search window. 
+
+    '''
+    if not isinstance(mouseLog, np.ndarray):
+        print "Error findVideoGazeOffset(): mouseLog is not a numpy array"
+
+    pass
+
 def findLastMatchOffset(context):
     ''' This function parses the 'context' tree, looks into the aoilist for the last aoi with id="__MATCH__".
     If not found, it returns None. If found, it returns the coordinate of the upper left corner.
@@ -834,7 +850,14 @@ def processVideo(v):
             ################################################
             # now only process when there is a large change
             ################################################
-            frameChanged = frameEngine.frameChanged(frame)
+            # in the case no jumpAhead is set, always assume the frame is changed.
+            if jumpAhead >0:
+                frameChanged = frameEngine.frameChanged(frame) 
+            else:
+                # no jummping ahead; so process every frame without change-detection.
+                frameChanged = True
+                skimmingMode = False
+
             # logging.debug("SkimmingMode ="+str(skimmingMode)+", lastCounter= "+str(lastCounter)+" frameNum= "+str(frameNum)+" skimFrames= "+str(skimFrames))
             if (frameChanged and skimmingMode and frameNum>skimFrames):
                 # now we need to rewind and redo this in the normal mode
@@ -850,7 +873,6 @@ def processVideo(v):
             #if (frameEngine.frameChanged(cv2.resize(frame, (0,0), fx= 0.25, fy=0.25)) or forcedCalc): #no significant performance gain
             if (frameChanged and not skimmingMode):
                 # let's do template matching to find if this is a valid task screen
-                taskSigLoc, minVal=None,None; 
                 # now go through the tasks and items
                 aoilist = []
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
