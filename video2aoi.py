@@ -19,16 +19,23 @@ import yaml
 ##################
 # functions
 def onChange (c):
+    '''callback function for controlling the videoPlayback'''
     video.set(cv.CV_CAP_PROP_POS_FRAMES, c*100)
 
-aoilist=[]
+def initAOIList ():
+    '''Init the global aoilist as an numpy record array'''
+    global aoilist
+    aoilist=[]
+    aoilist = np.array(aoilist, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    aoilist = aoilist.view(np.recarray)
+
 def updateAOI (data):
-    ''' This function takes a tuple with 7 elements and append it to the global aoilist[].
-    Data: (PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
+    ''' This function takes a tuple with 9 elements and append it to the global aoilist[].
+    Data: (basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
     '''
     global aoilist
     
-    if type(data)!=tuple or len(data)!=7:
+    if type(data)!=tuple or len(data)!=9:
         print "Error in UpdateAOI: data = "+str(data)
         return
         
@@ -38,7 +45,9 @@ def updateAOI (data):
     #     # if it's Assessment/items, then the aoiID becomes the page name
     #     data[0]=data[1]
 
-    aoilist.append(data)
+    #aoilist.append(data)
+    aoilist = np.vstack([aoilist, [data]])
+
 
 def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 17):
     '''Given the mouseLog (in numpy array) and videoMouseLocations (a numpy array) that contains
@@ -51,9 +60,31 @@ def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     temporalThreshold is the parameter for the search window. 
 
     '''
+
     if not isinstance(mouseLog, np.ndarray):
         print "Error findVideoGazeOffset(): mouseLog is not a numpy array"
+        return None
+    if not isinstance(videoMouseLocations, np.ndarray):
+        print "Error findVideoGazeOffset(): videoMouseLocations is not a numpy array"
+        return None
 
+
+    pass
+
+def getVideoScalingFactors (video):
+    '''This called at the beginning of a video processing task to identify the shifting and scaling
+    factors needed to convert things into a standard metrics. For example, if the AOIs are defined 
+    on a 1920x1080 video with a fullscreen, centered IE browser window with no zooming, and the current
+    video is 1280x1024 with a windowed FF browser, we will need to rescale the current AOIs and gaze xy 
+    such that the output is standardized on the 1920x1080 image, with the content areas perfectly 
+    overlaied.
+
+    We take the video handle as input. Will FF to about 20%, start skimming forward until we get a match
+    of the Assessment signature via fullscreen temmplate matching with different scales. 
+
+    Once we have a match, we determin the 
+
+    '''
     pass
 
 def findLastMatchOffset(context):
@@ -435,7 +466,7 @@ def p2Task(k, value, context):
         or "OCR" won't get processed unless it's under a dict entry.  
     '''
 
-    global signatureImageDict, frame, txt, yamlconfig, skimmingMode
+    global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
     
     #print "p2Task: k="+str(k) +" v="+str(v)
     # need to look into the v for a field called "match"
@@ -544,7 +575,7 @@ def p2Task(k, value, context):
         coord[3]= h+ objoffset[1]
 
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-        updateAOI((str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
 
     # if successful match or NO match needed
@@ -561,7 +592,7 @@ def p2Task(k, value, context):
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor'
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
     if "relativeAOI" in value:
         # something like: relativeAOI: 0, 0, 785, 573
@@ -588,7 +619,7 @@ def p2Task(k, value, context):
         # output
         pageTitle = "/".join(context)
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
     
     if "ocr" in value: 
         coord = map(int, value["ocr"].split(","))   # in order x1, y1, x2, y2
@@ -683,7 +714,7 @@ def processVideo(v):
 
     global yamlconfig, gaze, aoilist, toffset, logLevel, outputLogFileSuffix
     global video, frame,  startFrame #, minVal, taskSigLoc,
-    global txt, vTime, jumpAhead, skimmingMode
+    global txt, basename, vTime, jumpAhead, skimmingMode
     global gazex, gazey, mousex, mousey, activeAOI
     
     # local vars
@@ -787,10 +818,30 @@ def processVideo(v):
 
     # set the flag for skimmingMode
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
-    aoilist=[]; lastCounter=0; lastVTime=0;
-
+    lastCounter=0; lastVTime=0;
     # set colorplane choices
     colorPlane = getColorPlane()
+   
+    # aoilist is a numpy record array
+    initAOIList()
+
+    # find the video-gaze time offset
+    tmp= findVideoGazeOffset()
+    tOffset = tmp if tmp is not None else tOffset
+
+    # get the AOI shift and scale parameters
+    tmp = getVideoScalingFactors(video)
+    (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
+
+    # remap gaze and mouse data using the shift/scale parameters
+    # we will also reshape the video frame to 'standardize'
+    # this is because we want to have all data accross subjects to be on the same scale,
+    #  i.e., the signature files, when we later want to do heatmaps.
+    # under this scheme, the AOI definitions are not changed, nor are the signature files.
+    # we will waste a lot of CPU to rescale the video frames.
+
+    # No, it makes more sense to transform the AOIs during the processing. Then during the
+    # output we can standardize both the gaze/mouse and the AOIs.
 
     ###############################
     # now loop through the frames
@@ -869,12 +920,14 @@ def processVideo(v):
                 # going back, rewind to frameNum
                 frameEngine.clearLastFrame()    # clear the lastFrame buffer, so that the first rewinded frame will be taken as the template to compare with.
                 continue
-                
+            
+            # resize the video frame 
+
             #if (frameEngine.frameChanged(cv2.resize(frame, (0,0), fx= 0.25, fy=0.25)) or forcedCalc): #no significant performance gain
             if (frameChanged and not skimmingMode):
                 # let's do template matching to find if this is a valid task screen
                 # now go through the tasks and items
-                aoilist = []
+                # aoilist = []
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
                 aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
                 aoilist = aoilist.view(np.recarray)
