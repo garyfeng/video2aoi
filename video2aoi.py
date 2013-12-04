@@ -26,8 +26,8 @@ def initAOIList ():
     '''Init the global aoilist as an numpy record array'''
     global aoilist
     aoilist=[]
-    aoilist = np.array(aoilist, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    aoilist = aoilist.view(np.recarray)
+    #aoilist = np.array(aoilist, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    #aoilist = aoilist.view(np.recarray)
 
 def updateAOI (data):
     ''' This function takes a tuple with 9 elements and append it to the global aoilist[].
@@ -45,8 +45,13 @@ def updateAOI (data):
     #     # if it's Assessment/items, then the aoiID becomes the page name
     #     data[0]=data[1]
 
-    #aoilist.append(data)
-    aoilist = np.vstack([aoilist, [data]])
+    aoilist.append(data)
+
+    # tried to use numpy array for aoilist but found out that numpy is not efficent
+    # in appending rows ... it requires realloc memory, etc. And it crashes easily
+    # when mixing tuples and nparrays if one is not careful. 
+    # so I decide to stick with lists, until the point of AOI matching. 
+    # aoilist = np.vstack([aoilist, [data]])
 
 
 def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 17):
@@ -67,6 +72,26 @@ def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     if not isinstance(videoMouseLocations, np.ndarray):
         print "Error findVideoGazeOffset(): videoMouseLocations is not a numpy array"
         return None
+    if np.shape(videoMouseLocations)[0]<2 :
+        print "Error findVideoGazeOffset(): need at least 2 samples for videoMouseLocations "
+        return None
+    if np.shape(mouseLog)[0]<2 :
+        print "Error findVideoGazeOffset(): need at least 2 samples for mouseLog "
+        return None
+
+    # sort by time
+    mouseLog.sort(order ='t')
+    dump = np.copy(mouseLog)
+    videoMouseLocations.sort(order='t')
+
+    # find candidates that matches the first mouseLocation
+    for vm in videoMouseLocations:
+        # loop through 
+        activeAOI=mouseLog[np.where(mouseLog.x+locationThreshold<=vm.x )]
+        activeAOI=activeAOI[np.where(activeAOI.x2>x)]
+        activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
+        activeAOI=activeAOI[np.where(activeAOI.y2>y)]
+
 
 
     pass
@@ -85,7 +110,7 @@ def getVideoScalingFactors (video):
     Once we have a match, we determin the 
 
     '''
-    pass
+    return (0,0,1,1)
 
 def findLastMatchOffset(context):
     ''' This function parses the 'context' tree, looks into the aoilist for the last aoi with id="__MATCH__".
@@ -109,7 +134,10 @@ def findLastMatchOffset(context):
     offset=[-9999, -9999]
     #contextLen = 0
 
-    for d in aoilist:
+    # get the AOIs on the current page
+    currentAOIs = [a for a in aoilist if a[1]== vTime]
+
+    for d in currentAOIs:
         # look for the match with the longest context, which is the "deepest" match
         # if d[1] == "__MATCH__" and len(d[0]) > contextLen:
         #     offset[0] = d[3]
@@ -207,22 +235,30 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
     # not the best idea but we need to keep track of these for displaying the gaze data. 
     # unless we want to re-calculate these every time
-    global gazex, gazey, mousex, mousey, activeAOI
+    global gazex, gazey, mousex, mousey, activeAOI, aoilist
 
     if len(allevents)==0: 
         logging.error("logEvents: no event data")
         return False
     if (lastVTime>vTime):
         logging.error("logEvents: lastVTime {} > vTime {}. Flipping them".format(lastVTime, vTime))
-        dump = vTime
-        vTime=lastVTime
-        lastVTime=dump
+        return False
+        # dump = vTime
+        # vTime=lastVTime
+        # lastVTime=dump
 
     # set gaze pos to missing, but not mouse pos
     gazex=-32768; gazey=-32768;
 
+    # get the AOIs on the current page
+    currentAOIs = [a for a in aoilist if a[1]== vTime]
+    # converting aoilist from a list of numpy array
+    # is this even necessary?
+    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    currentAOIs = currentAOIs.view(np.recarray)
+
     # debug: output AOIs
-    for a in aoilist:
+    for a in currentAOIs:
         logging.debug("logEvents: AOI = {}".format("\t".join([str(s) for s in a])))
  
     # the original algorithm only gets the last gaze sample 
@@ -250,7 +286,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         # you shouldn't have a case whereaoistring is undefined without the follow ling but it had occurred. 
         currItem = "NONAOI"
         aoistring = currItem+"\t\t\t\t\t\t"
-        for a in aoilist:
+        for a in currentAOIs:
             #logging.debug("logEvents: aoi page = {}".format(a["page"]))
             # if the page title starts with Assessment/items, then this is the page, and we exit this loop
             if a["page"].startswith("Assessment/items"):
@@ -259,13 +295,13 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
                 break
 
         # Now start to assign AOI, for each matching AOI; if there are no matching AOIs, we print the page title        
-        if len(aoilist)==0:
+        if len(currentAOIs)==0:
             aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
             activeAOI=[]  
         elif x>0 and y>0:
             # this skips keystrokes and missing data, junk screen etc.
             # now do aoi matching
-            activeAOI=aoilist[np.where(aoilist.x1<=x )]
+            activeAOI=currentAOIs[np.where(currentAOIs.x1<=x )]
             activeAOI=activeAOI[np.where(activeAOI.x2>x)]
             activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
             activeAOI=activeAOI[np.where(activeAOI.y2>y)]
@@ -303,16 +339,20 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
 def displayFrame(windowName):
     '''Shows the current frame of video, along with AOI and gaze/mouse '''
-    global frame, txt, yamlconfig, aoilist, vTime
+    global frame, txt, yamlconfig, vTime
     global gazex, gazey, mousex, mousey, activeAOI
 
     text_color = (128,128,128)
     txt+= ", gaze=({}, {}), mouse=({}, {})".format(gazex, gazey, mousex, mousey)
     cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
+
+    # get the AOIs on the current page
+    currentAOIs = [a for a in aoilist if a[1]== vTime]
+
     # display rect for aoilist elements
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
         # if aoilist is not None:
-        for d in aoilist:
+        for d in currentAOIs:
             #if "__MATCH__" in d["id"]:
             if d["id"].startswith("__MATCH__"):
                 # matching or tracking images
@@ -322,7 +362,7 @@ def displayFrame(windowName):
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
     
     # displays the AOI of the last matched object
-    if len(aoilist)>0 and len(activeAOI)>0: 
+    if len(currentAOIs)>0 and len(activeAOI)>0: 
         for d in activeAOI:
             #if not ("__MATCH__" in d["id"]):
             if not d["id"].startswith("__MATCH__"):
@@ -450,7 +490,14 @@ def p2ReadSignatureImage(k, value, c):
     #   - lastKnownPosition: these will be set to None first but 
     signatureImageDict[fname]=img
     return True
-                
+
+def resizeSignatureImages(aoiScaleX, aoiScaleY):
+    '''rescale images in the signatureImageDict by the xy scaling factors'''
+    global signatureImageDict
+    for k, img in signatureImageDict:
+        signatureImageDict[k] = cv2.resize(img, (0,0), fx= aoiScaleX, fy=aoiScaleY) 
+
+
 def p2Task(k, value, context):
     '''A callback function for p2YAML(). It taks a list of keys (context) and a Value from the
     yamlconfig, and takes appropriate actions; 
@@ -833,6 +880,9 @@ def processVideo(v):
     tmp = getVideoScalingFactors(video)
     (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
 
+    # resize the signature images
+    resizeSignatureImages(aoiScaleX, aoiScaleY)
+
     # remap gaze and mouse data using the shift/scale parameters
     # we will also reshape the video frame to 'standardize'
     # this is because we want to have all data accross subjects to be on the same scale,
@@ -921,16 +971,14 @@ def processVideo(v):
                 frameEngine.clearLastFrame()    # clear the lastFrame buffer, so that the first rewinded frame will be taken as the template to compare with.
                 continue
             
-            # resize the video frame 
-
             #if (frameEngine.frameChanged(cv2.resize(frame, (0,0), fx= 0.25, fy=0.25)) or forcedCalc): #no significant performance gain
             if (frameChanged and not skimmingMode):
                 # let's do template matching to find if this is a valid task screen
                 # now go through the tasks and items
                 # aoilist = []
                 p2YAML(yamlconfig["tasks"], p2Task)     # this implicitly fills the aoilist[]
-                aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-                aoilist = aoilist.view(np.recarray)
+                #aoilist = np.array(aoilist, dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+                #aoilist = aoilist.view(np.recarray)
 
             
             ##############################
