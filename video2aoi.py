@@ -15,6 +15,7 @@ from FrameEngine import *    #FrameEngine
 
 import yaml
 
+import findVideoGazeOffset
     
 ##################
 # functions
@@ -53,48 +54,6 @@ def updateAOI (data):
     # so I decide to stick with lists, until the point of AOI matching. 
     # aoilist = np.vstack([aoilist, [data]])
 
-
-def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 17):
-    '''Given the mouseLog (in numpy array) and videoMouseLocations (a numpy array) that contains
-    some fractions of mouse locations found in the video frames via template matching, find the 
-    most likely time shift parameter. None if no offset parameter can be found. 
-
-    locationThreshold is the parameter for difference in x,y locations between the mouseLog and 
-    videoMouseLocations; default is 2 pixels in either x or y.
-
-    temporalThreshold is the parameter for the search window. 
-
-    '''
-
-    if not isinstance(mouseLog, np.ndarray):
-        print "Error findVideoGazeOffset(): mouseLog is not a numpy array"
-        return None
-    if not isinstance(videoMouseLocations, np.ndarray):
-        print "Error findVideoGazeOffset(): videoMouseLocations is not a numpy array"
-        return None
-    if np.shape(videoMouseLocations)[0]<2 :
-        print "Error findVideoGazeOffset(): need at least 2 samples for videoMouseLocations "
-        return None
-    if np.shape(mouseLog)[0]<2 :
-        print "Error findVideoGazeOffset(): need at least 2 samples for mouseLog "
-        return None
-
-    # sort by time
-    mouseLog.sort(order ='t')
-    dump = np.copy(mouseLog)
-    videoMouseLocations.sort(order='t')
-
-    # find candidates that matches the first mouseLocation
-    for vm in videoMouseLocations:
-        # loop through 
-        activeAOI=mouseLog[np.where(mouseLog.x+locationThreshold<=vm.x )]
-        activeAOI=activeAOI[np.where(activeAOI.x2>x)]
-        activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
-        activeAOI=activeAOI[np.where(activeAOI.y2>y)]
-
-
-
-    pass
 
 def getVideoScalingFactors (video):
     '''This called at the beginning of a video processing task to identify the shifting and scaling
