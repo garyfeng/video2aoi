@@ -15,7 +15,7 @@ from FrameEngine import *    #FrameEngine
 
 import yaml
 
-import findVideoGazeOffset
+from findVideoGazeOffset import *
     
 ##################
 # functions
@@ -32,8 +32,11 @@ def initAOIList ():
 
 def updateAOI (data):
     ''' This function takes a tuple with 9 elements and append it to the global aoilist[].
-    Data: (basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
+
+    :param Data: (basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
+
     '''
+
     global aoilist
     
     if type(data)!=tuple or len(data)!=9:
@@ -53,6 +56,59 @@ def updateAOI (data):
     # when mixing tuples and nparrays if one is not careful. 
     # so I decide to stick with lists, until the point of AOI matching. 
     # aoilist = np.vstack([aoilist, [data]])
+
+def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
+    global txt, frame, vTime
+
+    mouseVideoData=[]
+    # let's look into the video to see if we can template-match the mouse icon
+    # read the mouse icon into the signatureImage list
+    p2ReadSignatureImage(None, {'match':"mouse1.png"}, None)
+    # this is slightly complicated because there may be a path added to the filename
+    sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find("mouse1") >0]
+    print "mouse signature len = {}".format(len(sig))
+
+    sig = sig[0] if len(sig)>0 else None
+
+    if sig is not None:
+        # jump to about 20% into the video
+        video.set(cv.CV_CAP_PROP_POS_FRAMES, int(startTime * video.get( cv.CV_CAP_PROP_FPS )/1000))
+        while video.grab():
+            flag, frame = video.retrieve()
+            vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
+            #print "vTime = {}".format(vTime)
+            # match the mouse position, using a threshold
+            res = frameEngine.findMatch(frame, sig, 0.02)
+            
+            # add to mouseVideoData if it's position has changed
+            if res is not None:
+                # only proceed if Match succeeded
+                mouseLoc, minVal=res
+                # only store non-repeating values
+                if len(mouseVideoData) ==0 or mouseLoc[0] != mouseVideoData[-1][1] or mouseLoc[1] == mouseVideoData[-1][2]:
+                    mouseVideoData.append((vTime, mouseLoc[0], mouseLoc[1]))
+                    print "Mouse Found @ {}, val={}".format(mouseLoc, minVal)
+                    #(basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
+                    updateAOI(("Mouse", 0, "Mouse", "Mouse", "Mouse", mouseLoc[0], mouseLoc[1],  mouseLoc[0]+10, mouseLoc[1]+10))
+            else:
+                # if no match, jump forward a bit
+                video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+5)
+            # stop if len(mouseVideoData) > 2
+            if len(mouseVideoData) >nSamples: break
+
+            txt="Find Mouse, vTime={}".format(vTime)
+            displayFrame(windowName)
+
+            # else jump forward 1 sec
+            #video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+60)
+
+        # rewind the video
+        video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
+    else:
+        # error, can't find the sig
+        return None
+    # mouseVideoData can be shorter than nSamples if the video ends
+    return mouseVideoData
 
 
 def getVideoScalingFactors (video):
@@ -95,19 +151,16 @@ def findLastMatchOffset(context):
 
     # get the AOIs on the current page
     currentAOIs = [a for a in aoilist if a[1]== vTime]
+    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    currentAOIs = currentAOIs.view(np.recarray)
 
     for d in currentAOIs:
         # look for the match with the longest context, which is the "deepest" match
-        # if d[1] == "__MATCH__" and len(d[0]) > contextLen:
-        #     offset[0] = d[3]
-        #     offset[1] = d[4]
-        #     contextLen = len(d[0])
-        # look for the match with the longest context, which is the "deepest" match
         #print "findLastMatchOffset: input context = '{}' ".format(str(context))
         for key in c:
-            if d[1] == "__MATCH__"+str(key):
-                offset[0] = d[3]
-                offset[1] = d[4]
+            if d["id"] == "__MATCH__"+str(key):
+                offset[0] = d["x1"]
+                offset[1] = d["y1"]
                 break;
     # now done with searching, return None if nothing is found
     #if offset[0] == -9999: return None
@@ -186,15 +239,22 @@ def readEventData(basename):
     return alldata
 
 def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
-    '''Function to extract event info, and a time window, and log events inside the window.
-    Returns True if all goes well, or False if something is wrong.
-    allevents is of the format names=['t', 'event', 'x', 'y', 'info']
-    aoilist is of the format  dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)]
+    '''To log gaze and mouse events and associated AOIs to the log file. It takes the event list, aoi list, and timestamps 
+    defining the begining and the end of the window (typically since the last time the AOIlist has been changed). It returns
+    True if all goes well, or False if something went wrong. 
+
+    The current version still uses some global vars. These can be eliminted if we switch to a Class AOI
+
+    :returns: True if all goes well, or False if something is wrong.
+    :param allevents:  of the format names=['t', 'event', 'x', 'y', 'info']
+    :param aoilist: of the format  dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)]
+    :param lastVTime: integer timestamp of the beginning time
+    :param vTime: integer timestamp of the end time from which the gaze/mouse samples will be logged
     '''
 
     # not the best idea but we need to keep track of these for displaying the gaze data. 
     # unless we want to re-calculate these every time
-    global gazex, gazey, mousex, mousey, activeAOI, aoilist
+    global gazex, gazey, mousex, mousey, activeAOI
 
     if len(allevents)==0: 
         logging.error("logEvents: no event data")
@@ -224,7 +284,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
     # see http://stackoverflow.com/questions/12647471/the-truth-value-of-an-array-with-more-than-one-element-is-ambigous-when-trying-t
     #temp = gaze[np.where(np.logical_and(gaze.t>lastVTime+toffset, gaze.t<=vTime+toffset))]   
-    frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+toffset, allevents.t<=vTime+toffset))]  
+    frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+tOffset, allevents.t<=vTime+tOffset))]  
     # sort by time so that the output is in order 
     frameEvents.sort(order="t")
     for e in frameEvents:
@@ -232,7 +292,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
         # if we use vTime in the output, we can't tell the exact video time
         # so we back calculate here from gt:
-        videoTime = etime -toffset
+        videoTime = etime -tOffset
         estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], int(videoTime), etime, e["x"], e["y"], e["info"])
 
         try:        
@@ -306,7 +366,11 @@ def displayFrame(windowName):
     cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
 
     # get the AOIs on the current page
-    currentAOIs = [a for a in aoilist if a[1]== vTime]
+    tlist = [a[1] for a in aoilist if a[1] <= vTime]
+    lastVTime = max(tlist) if len(tlist)>0 else vTime
+    currentAOIs = [a for a in aoilist if a[1]== lastVTime]
+    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    currentAOIs = currentAOIs.view(np.recarray)
 
     # display rect for aoilist elements
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
@@ -453,8 +517,8 @@ def p2ReadSignatureImage(k, value, c):
 def resizeSignatureImages(aoiScaleX, aoiScaleY):
     '''rescale images in the signatureImageDict by the xy scaling factors'''
     global signatureImageDict
-    for k, img in signatureImageDict:
-        signatureImageDict[k] = cv2.resize(img, (0,0), fx= aoiScaleX, fy=aoiScaleY) 
+    for k in signatureImageDict:
+        signatureImageDict[k] = cv2.resize(signatureImageDict[k], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
 
 
 def p2Task(k, value, context):
@@ -507,7 +571,7 @@ def p2Task(k, value, context):
                 return True
         # extract the signature if sourceLoc is specified
         # this means that (a) fname is the src and (b) match will be attempted at this perceise location
-        img=np.copy(frame)
+        #img=np.copy(frame)
         srccoord=[0,0,0,0]
         if "sourceLoc" in value:
             # something like: sourceLoc: 836, 294, 256, 140
@@ -831,13 +895,46 @@ def processVideo(v):
     # aoilist is a numpy record array
     initAOIList()
 
+    ###########################################
     # find the video-gaze time offset
-    tmp= findVideoGazeOffset()
-    tOffset = tmp if tmp is not None else tOffset
+    ###########################################
+    mouseData = alldata[np.where(alldata.event=="mouse")]
+    mouseData = mouseData.view(np.recarray)
+
+    print "mouseData data len = "+str(len(mouseData))
+
+    txt=""; gazex=0; gazey=0; mousex=0; mousey=0
+    mouseVideoData =[]    
+    tmp = None
+    mvdStartTime = 0
+
+    if len(mouseData)>3:
+        while tmp is None:
+            # there is mouse data in the eventdata.
+            d = getMousePositionsFromVideo(video, windowName, nSamples=10, startTime=mvdStartTime)
+            [mouseVideoData.append(i) for i in d]
+
+            # now we turn mosueVideoData into a numpy record array
+            mvd = np.array(mouseVideoData, dtype=[('t',int), ('x', int), ('y', int)])
+            mvd = mvd.view(np.recarray)
+            # next round starts 1sec after the last mouse sighting
+            mvdStartTime = np.max(mvd.t) + 1000
+
+            # find the offset
+            tmp= findVideoGazeOffset(mouseData, mvd, 2, 250)
+            print "findVideoGazeOffset returns {}".format(tmp)
+            logging.info( "findVideoGazeOffset returns {}".format(tmp))
+
+    # now set the global toffset
+    toffset = tmp if tmp is not None else toffset
+    # clear the AOIs
+    initAOIList()
+    ###########################################
 
     # get the AOI shift and scale parameters
     tmp = getVideoScalingFactors(video)
     (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
+
 
     # resize the signature images
     resizeSignatureImages(aoiScaleX, aoiScaleY)
@@ -946,10 +1043,7 @@ def processVideo(v):
             if processGazeLog:
                 if not logEvents(alldata, aoilist, lastVTime, vTime, toffset):
                     # error logging, which shouldn't happen
-                    logging.error("processGazeLog: error logging events for {}-{}, tOffset={}".format(lastVTime, vTime, tOffset))
-
-            # end of AOI logging, do some updates:
-            lastVTime = vTime   # used to track gazes during skimming.
+                    logging.error("processGazeLog: error logging events for {}-{}, toffset={}".format(lastVTime, vTime, toffset))
 
             ############################
             # display video
@@ -961,6 +1055,9 @@ def processVideo(v):
             if (vTime%10000 ==0):
                 print " "+str(int(vTime/10000)*10), 
                 if showVideo: cv2.setTrackbarPos(taskbarName, windowName, int(frameNum/100))
+
+            # end of AOI logging, do some updates:
+            lastVTime = vTime   # used to track gazes during skimming.
         ##################
         # if flag:
         ##################
@@ -1088,7 +1185,7 @@ def main():
     testMode = True if (args.testingMode is "T") else False
 
     #print "Loglevel: INFO={} DEBUG={}; current setting is {}={}".format(logging.INFO, logging.DEBUG, args.logLevel, logLevel)
-    print "INFO: startFrame: {}; jumpAhead={}; tOffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
+    print "INFO: startFrame: {}; jumpAhead={}; toffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
     # exit(0)
 
 
