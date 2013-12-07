@@ -59,6 +59,7 @@ def updateAOI (data):
 
 def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
     global txt, frame, vTime
+    global signatureImageDict
 
     mouseVideoData=[]
     # let's look into the video to see if we can template-match the mouse icon
@@ -173,7 +174,7 @@ def findLastMatchOffset(context):
 
 def getColorPlane():
     '''Returns the color plane code specified in the YAML file'''
-    global yamlconfig
+    #global yamlconfig
 
     colorPlane = -99; #use all colors
     if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:

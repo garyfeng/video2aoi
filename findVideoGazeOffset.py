@@ -1,6 +1,11 @@
 import numpy as np
 import logging
 
+#from FrameEngine import *    #FrameEngine
+#from video2aoi import displayFrame, p2ReadSignatureImage
+
+#global yamlconfig
+
 def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 250):
     '''Given the mouseLog (in numpy array) and videoMouseLocations (a numpy array) that contains
     some fractions of mouse locations found in the video frames via template matching, find the 
@@ -79,7 +84,10 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     return t
 
 
-
+    ########################
+    # the following is an alternative algorithm for estimating the toffset
+    # not fully debugged and probably unnecessary
+    ########################
     # # notice we make it a plain list of integers
     # matchedIndices = [i[0] for i in matchedIndices if len(i)==1]
     # if len(matchedIndices) <1:
@@ -209,4 +217,4 @@ if __name__ == "__main__":
     # change the x,y 
     # change the timing
 
-    print findVideoGazeOffset(mouseData, testData, locationThreshold=1, temporalThreshold = 16)
+    print findGazeVideoOffset(mouseData, testData, locationThreshold=1, temporalThreshold = 16)
