@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 8, temporalThreshold = 250):
+def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, temporalThreshold = 250):
     '''Given the mouseLog (in numpy array) and videoMouseLocations (a numpy array) that contains
     some fractions of mouse locations found in the video frames via template matching, find the 
     most likely time shift parameter. None if no offset parameter can be found. 
@@ -50,12 +50,12 @@ def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 8, te
         # if there is no match
         if sqdist_min > locationThreshold: 
             logging.info( "Info findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm))
-            print "Info findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
+            #print "Info findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
             return None
         # else we find the argmins, convert to list
         matchedIndices.append( np.where(sqdist == sqdist_min))
     logging.info( "matchedIndices = {}".format(matchedIndices))
-    print "matchedIndices = {}".format(matchedIndices)
+    #print "matchedIndices = {}".format(matchedIndices)
 
     # drop those locations with multiple matches, i.e., where the mouse has passed several times
     # so what's left is the unique matches
@@ -75,7 +75,7 @@ def findVideoGazeOffset(mouseLog, videoMouseLocations, locationThreshold = 8, te
         t = (sumG- sumV)/c
     else:
         t = None   
-    print "t= {}".format(t)
+    #print "t= {}".format(t)
     return t
 
 

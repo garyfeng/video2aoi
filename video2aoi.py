@@ -63,9 +63,9 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
     mouseVideoData=[]
     # let's look into the video to see if we can template-match the mouse icon
     # read the mouse icon into the signatureImage list
-    p2ReadSignatureImage(None, {'match':"mouse1.png"}, None)
+    p2ReadSignatureImage(None, {'match':"mousetracking.png"}, None)
     # this is slightly complicated because there may be a path added to the filename
-    sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find("mouse1") >0]
+    sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find("mousetracking") >0]
     print "mouse signature len = {}".format(len(sig))
 
     sig = sig[0] if len(sig)>0 else None
@@ -73,6 +73,8 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
     if sig is not None:
         # jump to about 20% into the video
         video.set(cv.CV_CAP_PROP_POS_FRAMES, int(startTime * video.get( cv.CV_CAP_PROP_FPS )/1000))
+        lastx = 0; lasty = 0;
+
         while video.grab():
             flag, frame = video.retrieve()
             vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
@@ -85,11 +87,13 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
                 # only proceed if Match succeeded
                 mouseLoc, minVal=res
                 # only store non-repeating values
-                if len(mouseVideoData) ==0 or mouseLoc[0] != mouseVideoData[-1][1] or mouseLoc[1] == mouseVideoData[-1][2]:
+                #print "mouse: cur = {}  last = {},{}".format(mouseLoc, lastx, lasty)
+                if len(mouseVideoData) ==0 or mouseLoc[0] != lastx or mouseLoc[1] !=lasty:
                     mouseVideoData.append((vTime, mouseLoc[0], mouseLoc[1]))
                     print "Mouse Found @ {}, val={}".format(mouseLoc, minVal)
                     #(basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
                     updateAOI(("Mouse", 0, "Mouse", "Mouse", "Mouse", mouseLoc[0], mouseLoc[1],  mouseLoc[0]+10, mouseLoc[1]+10))
+                    lastx, lasty = mouseLoc
             else:
                 # if no match, jump forward a bit
                 video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+5)
@@ -97,7 +101,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
             if len(mouseVideoData) >nSamples: break
 
             txt="Find Mouse, vTime={}".format(vTime)
-            displayFrame(windowName)
+            if not displayFrame(windowName): exit(-1)
 
             # else jump forward 1 sec
             #video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+60)
@@ -921,9 +925,9 @@ def processVideo(v):
             mvdStartTime = np.max(mvd.t) + 1000
 
             # find the offset
-            tmp= findVideoGazeOffset(mouseData, mvd, 2, 250)
-            print "findVideoGazeOffset returns {}".format(tmp)
-            logging.info( "findVideoGazeOffset returns {}".format(tmp))
+            tmp= findGazeVideoOffset(mouseData, mvd, 4, 250)
+            print "findGazeVideoOffset returns {} based on {} observations".format(tmp, len(mouseVideoData))
+            logging.info( "findGazeVideoOffset returns {}".format(tmp))
 
     # now set the global toffset
     toffset = tmp if tmp is not None else toffset
