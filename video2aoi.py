@@ -49,6 +49,17 @@ def updateAOI (data):
     #     # if it's Assessment/items, then the aoiID becomes the page name
     #     data[0]=data[1]
 
+    # scale aois
+    x1 =data[5]; y1=data[6]; x2=data[7]; y2=data[8]
+
+    if not data[3].startswith("__MATCH__"):
+        x1=aoiShiftX + int((x1-aoiShiftX) * aoiScaleX)
+        x2=aoiShiftX + int((x2-aoiShiftX) * aoiScaleX)
+        y1=aoiShiftY + int((y1-aoiShiftY) * aoiScaleY)
+        y2=aoiShiftY + int((y2-aoiShiftY) * aoiScaleY)
+
+    data=(data[0], data[1], data[2], data[3], data[4], x1, y1, x2, y2)
+
     aoilist.append(data)
 
     # tried to use numpy array for aoilist but found out that numpy is not efficent
@@ -57,16 +68,16 @@ def updateAOI (data):
     # so I decide to stick with lists, until the point of AOI matching. 
     # aoilist = np.vstack([aoilist, [data]])
 
-def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
+def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, mouseTemplateName = "mousetracking.png"):
     global txt, frame, vTime
     global signatureImageDict
 
     mouseVideoData=[]
     # let's look into the video to see if we can template-match the mouse icon
     # read the mouse icon into the signatureImage list
-    p2ReadSignatureImage(None, {'match':"mousetracking.png"}, None)
+    p2ReadSignatureImage(None, {'match':mouseTemplateName}, None)
     # this is slightly complicated because there may be a path added to the filename
-    sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find("mousetracking") >0]
+    sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find(mouseTemplateName) >0]
     print "mouse signature len = {}".format(len(sig))
 
     sig = sig[0] if len(sig)>0 else None
@@ -116,7 +127,10 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0):
     return mouseVideoData
 
 
-def getVideoScalingFactors (video):
+def getVideoScalingFactors (video, TemplateSize = (1024, 640),
+                            topLeftTemplateName ="TopLeftCorner.png", 
+                            bottomRightTemplateName = "ButtomRightCorner.png",
+                            margins=(18,17,13,16) ):
     '''This called at the beginning of a video processing task to identify the shifting and scaling
     factors needed to convert things into a standard metrics. For example, if the AOIs are defined 
     on a 1920x1080 video with a fullscreen, centered IE browser window with no zooming, and the current
@@ -129,14 +143,72 @@ def getVideoScalingFactors (video):
 
     Once we have a match, we determin the 
 
+    :param video: the OpenCV video handler 
+    :param TemplateSize: the size of the original image
+    :param margins: margins for the topleft and bottomright corners. These are the actual corner
+                    inside the topleft image.
+    :param topLeftTemplateName: image name
+    :param bottomRightTemplateName: image name
+    :returns: a tuple of (shiftx, shifty, scalex, scaley), the shift and scaling parameters for the 
+                    region covered between the two corners. 
+
     '''
-    return (0,0,1,1)
+
+    # putting the corner templates in the signatureImageDict
+    p2ReadSignatureImage('topLeftTemplateName', {'match': topLeftTemplateName}, ['topLeftTemplateName'])
+    sig1=[signatureImageDict[fname] for fname in signatureImageDict if fname.find(topLeftTemplateName) >0]
+    sig1 = sig1[0] if len(sig1)>0 else None
+
+    p2ReadSignatureImage('bottomRightTemplateName', {'match':bottomRightTemplateName}, ['bottomRightTemplateName'])
+    sig2=[signatureImageDict[fname] for fname in signatureImageDict if fname.find(bottomRightTemplateName) >0]
+    sig2 = sig2[0] if len(sig2)>0 else None
+ 
+    # proceed if we got both corners
+    if sig1 is not None and sig2 is not None:
+        # jump to about 50% into the video
+        video.set(cv.CV_CAP_PROP_POS_FRAMES, int(video.get( cv.CV_CAP_PROP_FRAME_COUNT )/2))
+        x1, y1, x2, y2 = (0,0,0,0)
+
+        while video.grab():
+            flag, frame = video.retrieve()
+            #print "vTime = {}".format(vTime)
+            # match the mouse position, using a threshold
+            res1 = frameEngine.findMatch(frame, sig1['img'], 0.02)
+            res2 = frameEngine.findMatch(frame, sig2['img'], 0.02)
+            
+            # add to mouseVideoData if it's position has changed
+            if res1 is not None and res2 is not None:
+                # only proceed if Match succeeded
+                # topleft
+                mouseLoc, minVal=res1
+                x1, y1 = mouseLoc
+                x1 +=margins[0]; y1 += margins[1]
+
+                # bottomright
+                mouseLoc, minVal=res2
+                x2, y2 = mouseLoc
+                x2 +=margins[2]; y2 += margins[3]
+
+                break
+        # 
+        print "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1))
+        logging.info( "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
+        shiftx = x1; shifty = y1
+        scalex = 1 if x2==0 else (x2-x1)*1.0/TemplateSize[0]
+        scaley = 1 if y2==0 else (y2-y1)*1.0/TemplateSize[1]
+
+        # rewind the video
+        video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
+
+    return (shiftx, shifty, scalex, scaley)
 
 def findLastMatchOffset(context):
     ''' This function parses the 'context' tree, looks into the aoilist for the last aoi with id="__MATCH__".
     If not found, it returns None. If found, it returns the coordinate of the upper left corner.
 
-    context is a list. 
+    :param context: a list, which is a node of the parsed YAML config file. 
+    :returns: the location of the last matched template is found; None if nothing is found. 
+
     '''
     global aoilist
 
@@ -154,10 +226,12 @@ def findLastMatchOffset(context):
     offset=[-9999, -9999]
     #contextLen = 0
 
-    # get the AOIs on the current page
-    currentAOIs = [a for a in aoilist if a[1]== vTime]
-    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    currentAOIs = currentAOIs.view(np.recarray)
+    # # get the AOIs on the current page
+    # currentAOIs = [a for a in aoilist if a[1]== vTime]
+    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    # currentAOIs = currentAOIs.view(np.recarray)
+
+    currentAOIs = getCurrentAOIs(aoilist, vTime)
 
     for d in currentAOIs:
         # look for the match with the longest context, which is the "deepest" match
@@ -173,7 +247,10 @@ def findLastMatchOffset(context):
     return None if offset[0] == -9999 else offset
 
 def getColorPlane():
-    '''Returns the color plane code specified in the YAML file'''
+    '''Returns the color plane code specified in the YAML file
+    :returns: the color plane: default = -99 = all colors; 0 = Blue; 1=Green, 2=Red; -1 = something wrong
+
+    '''
     #global yamlconfig
 
     colorPlane = -99; #use all colors
@@ -193,7 +270,10 @@ def getColorPlane():
 
 def readEventData(basename):
     ''' read the event log file as specified in basename and suffix in the yaml file.
-    Returns the data as a numpy Recarray. Else return None.
+    :param basename: a string that is the 'base name', with which we will add suffixes from the yamlconfig file
+        to find the data file, e.g., basename+"_eye.log" and read
+    :returns: the data as a numpy Recarray, or else  None.
+
     '''
     global yamlconfig
     # get the gaze/key/mouse data file name
@@ -242,6 +322,26 @@ def readEventData(basename):
     # process all the data, separate gaze/key/mouse events    
     alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
     return alldata
+def getCurrentAOIs (aoilist, vTime, lastVTime=0):
+    '''take the global AOI lise, a vTime, and a lastvTime, and return a list of the AOIs that are right before vTime, 
+        as a numpy record array
+
+    :param aoilist: a list of all aois, timestamped
+    :param vTime: the videoTime that we use to inquire the aoilist; we try to return the last set of aois before vTime
+    :param lastVTime: how far we go back in our time-search. Default is 0, from the beginning.
+    :returns: a list (possibly empty) of aois between [lastvTime and vTime]
+
+    '''
+
+    # get the AOIs on the current page
+    tlist = [a[1] for a in aoilist if a[1] <= vTime and a[1]>=lastVTime]
+    lastTime = max(tlist) if len(tlist)>0 else vTime
+    currentAOIs = [a for a in aoilist if a[1]== lastTime]
+    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    currentAOIs = currentAOIs.view(np.recarray)
+
+    return currentAOIs
+
 
 def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     '''To log gaze and mouse events and associated AOIs to the log file. It takes the event list, aoi list, and timestamps 
@@ -255,6 +355,9 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     :param aoilist: of the format  dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)]
     :param lastVTime: integer timestamp of the beginning time
     :param vTime: integer timestamp of the end time from which the gaze/mouse samples will be logged
+    :param tOffset: [default = 0] the offset between gaze and video, used to reconstruct the precise videoTime after skipping; 
+        Note that vTime for skipped frames is from the last non-skipped frame; we have to use the delta-time from the gazetime 
+        to recalcualte the actual vTime.
     '''
 
     # not the best idea but we need to keep track of these for displaying the gaze data. 
@@ -265,7 +368,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         logging.error("logEvents: no event data")
         return False
     if (lastVTime>vTime):
-        logging.error("logEvents: lastVTime {} > vTime {}. Flipping them".format(lastVTime, vTime))
+        logging.error("logEvents: lastVTime {} > vTime {}. **NOT** Flipping them".format(lastVTime, vTime))
         return False
         # dump = vTime
         # vTime=lastVTime
@@ -274,16 +377,23 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     # set gaze pos to missing, but not mouse pos
     gazex=-32768; gazey=-32768;
 
-    # get the AOIs on the current page
-    currentAOIs = [a for a in aoilist if a[1]== vTime]
-    # converting aoilist from a list of numpy array
-    # is this even necessary?
-    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    currentAOIs = currentAOIs.view(np.recarray)
+    # # get the AOIs on the current page
+    # currentAOIs = [a for a in aoilist if a[1]== vTime]
+    # # converting aoilist from a list of numpy array
+    # # is this even necessary?
+    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    # currentAOIs = currentAOIs.view(np.recarray)
+
+    currentAOIs = getCurrentAOIs(aoilist, vTime, lastVTime)
+    # scale the AOI back to the standardized, centering at the top-left corner
+    currentAOIs.x1 = ((currentAOIs.x1 - aoiShiftX)/ aoiScaleX ).astype(int)
+    currentAOIs.y1 = ((currentAOIs.y1 - aoiShiftY)/ aoiScaleY ).astype(int)
+    currentAOIs.x2 = ((currentAOIs.x2 - aoiShiftX)/ aoiScaleX ).astype(int)
+    currentAOIs.y2 = ((currentAOIs.y2 - aoiShiftY)/ aoiScaleY ).astype(int)
 
     # debug: output AOIs
     for a in currentAOIs:
-        logging.debug("logEvents: AOI = {}".format("\t".join([str(s) for s in a])))
+        logging.debug("logEvents: standardized AOI = {}".format("\t".join([str(s) for s in a])))
  
     # the original algorithm only gets the last gaze sample 
     # we need to report on all gaze samples that fall between this and last video frame that has been processed, tracked by lastVTime
@@ -292,22 +402,33 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     frameEvents = allevents[np.where(np.logical_and(allevents.t>lastVTime+tOffset, allevents.t<=vTime+tOffset))]  
     # sort by time so that the output is in order 
     frameEvents.sort(order="t")
+    logging.debug("logEvents: len(events) = {}, len(currentAOIs) = {}, lastvTime ={}, vTime={}".format(len(frameEvents), len(currentAOIs), lastVTime, vTime))
+
     for e in frameEvents:
         etime = int(e["t"])
         # vTime is the time of the current video frame, which, in the case of skimming, may have skipped several frames from the last check.
         # if we use vTime in the output, we can't tell the exact video time
         # so we back calculate here from gt:
         videoTime = etime -tOffset
-        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], int(videoTime), etime, e["x"], e["y"], e["info"])
+
+        # now dealing with aoiScaling. AOIs are scaled to fit the current video
+        # but we need now to scale both the gaze and AOI back to the "standard" version so that 
+        # we can produce consistent heatmaps, etc. 
+        # data are now centered at (aoiShiftX,aoiShiftY), or the topleft corner of the content.
+        # One benefit is that we can produce heatmaps easily on the content. 
 
         try:        
-            x=int(e["x"])
-            y=int(e["y"])
+            x=int((e["x"]-aoiShiftX)/ aoiScaleX)
+            y=int((e["y"]-aoiShiftY)/ aoiScaleY)
         except:
             # not available
             x=-32768; y=-32768
 
-        # you shouldn't have a case whereaoistring is undefined without the follow ling but it had occurred. 
+        #standardized x y usng global aoishift and aoiscale vars
+        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], int(videoTime), etime, x, y, e["info"])
+
+
+        # you shouldn't have a case where aoistring is undefined without the follow ling but it had occurred. 
         currItem = "NONAOI"
         aoistring = currItem+"\t\t\t\t\t\t"
         for a in currentAOIs:
@@ -324,23 +445,30 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
             activeAOI=[]  
         elif x>0 and y>0:
             # this skips keystrokes and missing data, junk screen etc.
-            # now do aoi matching
-            activeAOI=currentAOIs[np.where(currentAOIs.x1<=x )]
-            activeAOI=activeAOI[np.where(activeAOI.x2>x)]
-            activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
-            activeAOI=activeAOI[np.where(activeAOI.y2>y)]
-            if len(activeAOI)>0:
-                for aoi in activeAOI:
-                    #if not "__MATCH__" in aoi["id"]:
-                    if not aoi["id"].startswith("__MATCH__"):
-                        # skip templates for template matching or tracking
-                        aoistring="\t".join([str(s) for s in aoi])
-            else:
-                # gaze is not on an AOI; print out the name of the page; 
-                # keep in mind that aoilist[0] is the match template, which is not useful; 
-                # [-1] is often some other junk model thrown at the Assessment level, which we often don't want
-                # this should have a persistent "item" code even if the gaze is not on the item 
-                aoistring = str(currItem)+"\t\t\t\t\t\t"
+            aoistring = str(currItem)+"\t\t\t\t\t\t"
+            for aoi in currentAOIs:
+                # print aoi
+                if aoi["x1"] <=x and aoi["x2"] >x and aoi["y1"] <=y and aoi["y2"] >y and not aoi["id"].startswith("__MATCH__"):
+                    # this is when 
+                    aoistring="\t".join([str(s) for s in aoi])
+
+            # # now do aoi matching
+            # activeAOI=currentAOIs[np.where(currentAOIs.x1<=x )]
+            # activeAOI=activeAOI[np.where(activeAOI.x2>x)]
+            # activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
+            # activeAOI=activeAOI[np.where(activeAOI.y2>y)]
+            # if len(activeAOI)>0:
+            #     for aoi in activeAOI:
+            #         #if not "__MATCH__" in aoi["id"]:
+            #         if not aoi["id"].startswith("__MATCH__"):
+            #             # skip templates for template matching or tracking
+            #             aoistring="\t".join([str(s) for s in aoi])
+            # else:
+            #     # gaze is not on an AOI; print out the name of the page; 
+            #     # keep in mind that aoilist[0] is the match template, which is not useful; 
+            #     # [-1] is often some other junk model thrown at the Assessment level, which we often don't want
+            #     # this should have a persistent "item" code even if the gaze is not on the item 
+            #     aoistring = str(currItem)+"\t\t\t\t\t\t"
         else:
             # for keystrokes or bad gaze data, etc. at least print the page
             aoistring = str(currItem)+"\t\t\t\t\t\t"
@@ -354,15 +482,20 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         #  frameEngine.updateCurrentGaze(x,y)
         if "gaze" in e["event"]:
             # update gaze pos no matter what; missing data -> missing
-            gazex =x; gazey =y; 
+            gazex =int(e["x"]); gazey =int(e["y"]); 
         elif "mouse" in e["event"] and x>0 and y>0:
             # don't update mosue location if there is no mouse info in this frame
-            mousex=x; mousey=y;
+            mousex=int(e["x"]); mousey=int(e["y"]);
 
     return True
 
-def displayFrame(windowName):
-    '''Shows the current frame of video, along with AOI and gaze/mouse '''
+def displayFrame(windowName, aoiLastVTime=100):
+    '''Shows the current frame of video, along with AOI and gaze/mouse 
+    :param windowName: The name of the window that OpenCV uses to display the video
+    :param aoiLastVTime: opitional (default = 100ms), the time window to look back to find the aois to display
+    :returns: True if all is good. False if ESC is pressed; the program is supposed to quit 
+
+    '''
     global frame, txt, yamlconfig, vTime
     global gazex, gazey, mousex, mousey, activeAOI
 
@@ -370,12 +503,15 @@ def displayFrame(windowName):
     txt+= ", gaze=({}, {}), mouse=({}, {})".format(gazex, gazey, mousex, mousey)
     cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
 
-    # get the AOIs on the current page
-    tlist = [a[1] for a in aoilist if a[1] <= vTime]
-    lastVTime = max(tlist) if len(tlist)>0 else vTime
-    currentAOIs = [a for a in aoilist if a[1]== lastVTime]
-    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    currentAOIs = currentAOIs.view(np.recarray)
+    # # get the AOIs on the current page
+    # tlist = [a[1] for a in aoilist if a[1] <= vTime]
+    # lastVTime = max(tlist) if len(tlist)>0 else vTime
+    # currentAOIs = [a for a in aoilist if a[1]== lastVTime]
+    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    # currentAOIs = currentAOIs.view(np.recarray)
+
+    # get AOIs in the past 100ms
+    currentAOIs = getCurrentAOIs(aoilist, vTime, vTime - 100)
 
     # display rect for aoilist elements
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
@@ -388,14 +524,18 @@ def displayFrame(windowName):
             else:
                 # actual AOIs
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]) ,(255,0,0), 2)    
-    
-    # displays the AOI of the last matched object
-    if len(currentAOIs)>0 and len(activeAOI)>0: 
-        for d in activeAOI:
-            #if not ("__MATCH__" in d["id"]):
-            if not d["id"].startswith("__MATCH__"):
-                # actual active AOIs
+
+            if d["x1"] <=gazex and d["x2"] >gazex and d["y1"] <=gazey and d["y2"] >gazey and not d["id"].startswith("__MATCH__"):
+                # this is when 
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
+    
+    # # displays the AOI of the last matched object
+    # if len(currentAOIs)>0 and len(activeAOI)>0: 
+    #     for d in activeAOI:
+    #         #if not ("__MATCH__" in d["id"]):
+    #         if not d["id"].startswith("__MATCH__"):
+    #             # actual active AOIs
+    #             cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
                 
     # shows the gaze circle
     if not np.isnan(gazex+gazey): 
@@ -494,6 +634,15 @@ def p2ReadSignatureImage(k, value, c):
         # now get the sig from the source image
         img= img[coord[1]:coord[3], coord[0]:coord[2]]
 
+    destcoord = None
+    if "destRange" in value:
+        destcoord = map(int, value["destRange"].split(","))   # by default, in order x1, y1, x2, y2
+        if "aoiFormat" in yamlconfig["study"]:
+            if yamlconfig["study"]["aoiFormat"] == "xywh":
+                # the x,y,w,h format: convert to xyxy format
+                destcoord[2]=destcoord[2]+destcoord[0]
+                destcoord[3]=destcoord[3]+destcoord[1]
+
     # convert frame to single channel if needed
     if len(img.shape)>2 and colorPlane == -1:
         # grayscale
@@ -516,14 +665,181 @@ def p2ReadSignatureImage(k, value, c):
     #   - lastKnownImg: None at the begining; set at the first match
     #   - template(s): a list of templates, specified 
     #   - lastKnownPosition: these will be set to None first but 
-    signatureImageDict[fname]=img
+    sig={'id': "/".join(c + [k]),
+        'fname':fname,   
+        'img': img,
+        'w': img.shape[1],
+        'h': img.shape[0],
+        'sourceLoc': coord,
+        'destRange': destcoord,
+        'colorPlane': colorPlane,
+        'lastKnownPositionX': None,
+        'lastKnownPositionY': None,
+        'lastKnownBestFit': None,
+        'currentFit': None
+        }
+
+    #signatureImageDict[fname]=img
+    signatureImageDict[fname] = sig
+
     return True
 
-def resizeSignatureImages(aoiScaleX, aoiScaleY):
+def resizeSignatureImages(aoiScaleX, aoiScaleY, signatureImageDict):
     '''rescale images in the signatureImageDict by the xy scaling factors'''
-    global signatureImageDict
+    #global signatureImageDict
     for k in signatureImageDict:
-        signatureImageDict[k] = cv2.resize(signatureImageDict[k], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
+        #signatureImageDict[k] = cv2.resize(signatureImageDict[k], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
+        sig = signatureImageDict[k]
+        logging.debug("resizeSignatureImages: sig={}, size={}".format(k, np.shape(sig['img'])))
+
+        sig['img'] = cv2.resize(sig['img'], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
+        sig['h']= sig['img'].shape[0]
+        sig['w'] = sig['img'].shape[1]
+        signatureImageDict[k] = sig
+
+        logging.debug("resizeSignatureImages: ==> size={}".format(np.shape(sig['img'])))
+        # for debugging only
+        cv2.imwrite(sig['fname']+"_resized.png", sig["img"])
+
+def doTemplateMatching (k, value, context):
+    '''Do the template matching, called from p2Task'''
+    global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
+
+    # first make sure v is in the signature image list
+    para=value["match"].split(",")
+    fname = para[0]
+    if not isinstance(fname, str): 
+        logging.error("MATCH: expecting a filename but got "+str(fname))
+        return True
+    # if image path name is specified, can be absolute or relative
+    if "imgFilePath" in yamlconfig["study"].keys():
+        fname = os.path.join(yamlconfig["study"]["imgFilePath"], fname)
+    if not (fname in signatureImageDict):
+        logging.error("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
+        return True
+
+    # assuming the signature is the fname image, unless sourceLoc is specified later
+    sig=signatureImageDict[fname]
+
+    # optional threshold parameter
+    threshold = -99        
+    if len(para)==2:
+        try:
+            threshold = float(value["match"].split(",")[1])
+        except:
+            logging.error("MATCH: expecting a float number but got "+str(value["match"].split(",")[1]))
+            return True
+    # extract the signature if sourceLoc is specified
+    # this means that (a) fname is the src and (b) match will be attempted at this perceise location
+    #img=np.copy(frame)
+    srccoord=[0,0,0,0]
+    if "sourceLoc" in value:
+        # something like: sourceLoc: 836, 294, 256, 140
+        srccoord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
+        if "aoiFormat" in yamlconfig["study"]:
+            if yamlconfig["study"]["aoiFormat"] == "xywh":
+                # the x,y,w,h format: convert to xyxy format
+                srccoord[2]=srccoord[2]+srccoord[0]
+                srccoord[3]=srccoord[3]+srccoord[1]
+        # now get the sig from the source image
+        #img= frame[srccoord[1]:srccoord[3], srccoord[0]:srccoord[2]]
+
+    # now get the range of search in the destination
+    # if not specified, we cut the img from sourceLoc (add 1 px in each deminsion so the alg works)
+    # otherwise we cut the img out of frame based on destRange.
+    if "sourceLoc" in value:
+        destcoord = srccoord
+    else:
+        # no sourceLoc specified, we use the whole frame; 
+        # note the shape() func returns [h,w,#color] as in numpy
+        destcoord = [0,0, frame.shape[1], frame.shape[0]]
+
+    if not "destRange" in value:
+        # let's do +/- 2 pix on each side
+        destcoord[0]=destcoord[0]-2
+        destcoord[1]=destcoord[1]-2
+        destcoord[2]=destcoord[2]+2
+        destcoord[3]=destcoord[3]+2
+    else:
+        # destRange is in the value
+        destcoord = map(int, value["destRange"].split(","))   # by default, in order x1, y1, x2, y2
+        if "aoiFormat" in yamlconfig["study"]:
+            if yamlconfig["study"]["aoiFormat"] == "xywh":
+                # the x,y,w,h format: convert to xyxy format
+                destcoord[2]=destcoord[2]+destcoord[0]
+                destcoord[3]=destcoord[3]+destcoord[1]
+
+    # make sure everything is within the frame
+    if destcoord[0]<0: destcoord[0]=0
+    if destcoord[1]<0: destcoord[1]=0
+    if destcoord[2]>frame.shape[1]: destcoord[2]=frame.shape[1]
+    if destcoord[3]>frame.shape[0]: destcoord[3]=frame.shape[0]
+
+    # we now have the dest range; now use this to cut the image
+    img= frame[destcoord[1]:destcoord[3], destcoord[0]:destcoord[2]]
+
+    res = None
+    # first look at the lastKnownPosition
+    # @ this algorithm doesn't work, because all but one will fail the first
+    # @ then we are simply adding another round of matching
+    if (sig['lastKnownPositionX'] is not None):
+        # if it's already set, let's get the image
+        sigshape = sig['img'].shape
+        x1=sig['lastKnownPositionX']-2
+        y1=sig['lastKnownPositionY']-2
+        x2=x1+ sigshape[1]+2
+        y2=y1+ sigshape[0]+2
+
+        lastImg = frame[y1:y2, x1:x2]
+
+        # now let's find the template
+        if threshold == -99:
+            # use the global default threshold
+            res = frameEngine.findMatch(lastImg, sig['img'])
+        else:
+            # a new threshold is specified in the YAML file
+            res = frameEngine.findMatch(lastImg, sig['img'], threshold)
+
+    # if lastKnownPosition was not set or it was not found in there
+    if res is None:
+        # now let's find the template
+        if threshold == -99:
+            # use the global default threshold
+            res = frameEngine.findMatch(img, sig['img'])
+        else:
+            # a new threshold is specified in the YAML file
+            res = frameEngine.findMatch(img, sig['img'], threshold)
+    else:
+        # if the target is found at the last known position, add the offset back
+        destcoord[0] = sig['lastKnownPositionX']-2
+        destcoord[1] = sig['lastKnownPositionY']-2
+
+    
+    if res is None:
+        # no match found; stop processing child nodes
+        logging.debug("MATCH: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
+        if "unmatchLog" in value:
+            # need to log this event
+            logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
+        return None
+    # only proceed if Match succeeded
+    taskSigLoc, minVal=res
+    objoffset = [taskSigLoc[0] + destcoord[0], taskSigLoc[1] + destcoord[1]]
+
+    # update the lastKnownPositions
+    sig['lastKnownPositionX'] = objoffset[0]
+    sig['lastKnownPositionY'] = objoffset[1]
+    sig['lastKnownBestFit']   = minVal
+
+    coord=[0,0,0,0]
+    h, w, clr= sig['img'].shape
+    coord[0]= objoffset[0]
+    coord[1]= objoffset[1]
+    coord[2]= w+ objoffset[0]
+    coord[3]= h+ objoffset[1]
+
+    logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
+    updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
 
 def p2Task(k, value, context):
@@ -550,6 +866,10 @@ def p2Task(k, value, context):
         return True
     # check if there is a field "match"
     if "match" in value:
+        # first make sure v is in the signature image list
+        # @@ this doesn't work -- it plots all the AOIs at odd places
+        # doTemplateMatching(k, value, context)
+
         # first make sure v is in the signature image list
         para=value["match"].split(",")
         fname = para[0]
@@ -623,13 +943,40 @@ def p2Task(k, value, context):
         # we now have the dest range; now use this to cut the image
         img= frame[destcoord[1]:destcoord[3], destcoord[0]:destcoord[2]]
 
-        # now let's find the template
-        if threshold == -99:
-            # use the global default threshold
-            res = frameEngine.findMatch(img, sig)
+        res = None
+        # first look at the lastKnownPosition
+        if (sig['lastKnownPositionX'] is not None):
+            # if it's already set, let's get the image
+            sigshape = sig['img'].shape
+            x1=sig['lastKnownPositionX']-2
+            y1=sig['lastKnownPositionY']-2
+            x2=x1+ sigshape[1]+2
+            y2=y1+ sigshape[0]+2
+
+            lastImg = frame[y1:y2, x1:x2]
+
+            # now let's find the template
+            if threshold == -99:
+                # use the global default threshold
+                res = frameEngine.findMatch(lastImg, sig['img'])
+            else:
+                # a new threshold is specified in the YAML file
+                res = frameEngine.findMatch(lastImg, sig['img'], threshold)
+
+        # if lastKnownPosition was not set or it was not found in there
+        if res is None:
+            # now let's find the template
+            if threshold == -99:
+                # use the global default threshold
+                res = frameEngine.findMatch(img, sig['img'])
+            else:
+                # a new threshold is specified in the YAML file
+                res = frameEngine.findMatch(img, sig['img'], threshold)
         else:
-            # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(img, sig, threshold)
+            # if the target is found at the last known position, add the offset back
+            destcoord[0] = sig['lastKnownPositionX']-2
+            destcoord[1] = sig['lastKnownPositionY']-2
+
         
         if res is None:
             # no match found; stop processing child nodes
@@ -642,8 +989,13 @@ def p2Task(k, value, context):
         taskSigLoc, minVal=res
         objoffset = [taskSigLoc[0] + destcoord[0], taskSigLoc[1] + destcoord[1]]
 
+        # update the lastKnownPositions
+        sig['lastKnownPositionX'] = taskSigLoc[0]
+        sig['lastKnownPositionY'] = taskSigLoc[1]
+        sig['lastKnownBestFit']   = minVal
+
         coord=[0,0,0,0]
-        h, w, clr= sig.shape
+        h, w, clr= sig['img'].shape
         coord[0]= objoffset[0]
         coord[1]= objoffset[1]
         coord[2]= w+ objoffset[0]
@@ -651,7 +1003,6 @@ def p2Task(k, value, context):
 
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
         updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
-
 
     # if successful match or NO match needed
     if "log" in value: 
@@ -791,6 +1142,7 @@ def processVideo(v):
     global video, frame,  startFrame #, minVal, taskSigLoc,
     global txt, basename, vTime, jumpAhead, skimmingMode
     global gazex, gazey, mousex, mousey, activeAOI
+    global aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY
     
     # local vars
     alldata=None
@@ -845,9 +1197,6 @@ def processVideo(v):
     logging.info("video = "+str(v)+"\tScaling ratio =" +str(ratio) +"\tlog = '"+str(logfilename)+"'")
     logging.info("VideoFrameSize = "+str(video.get(cv.CV_CAP_PROP_FRAME_WIDTH ))+"\t"+str(video.get(cv.CV_CAP_PROP_FRAME_HEIGHT )))
 
-    # read signature image files for template matching
-    p2YAML(yamlconfig["tasks"], p2ReadSignatureImage)
-    
     # read eye event logs, only if doNotProcessGazeLog=False or unspecified
     processGazeLog = True
 
@@ -896,6 +1245,18 @@ def processVideo(v):
     lastCounter=0; lastVTime=0;
     # set colorplane choices
     colorPlane = getColorPlane()
+
+    ##########################################
+    # now test to see if the AOIs need to be scaled
+    ##########################################
+    # get the AOI shift and scale parameters
+    tmp = getVideoScalingFactors(video, TemplateSize = (1024, 640),
+                            topLeftTemplateName ="TopLeftCorner.png", 
+                            bottomRightTemplateName = "ButtomRightCorner.png",
+                            margins=(18,16,15,19) )
+    logging.info ("getVideoScalingFactors = {}".format(tmp))
+    #print "getVideoScalingFactors = {}".format(tmp)
+    (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
    
     # aoilist is a numpy record array
     initAOIList()
@@ -903,46 +1264,47 @@ def processVideo(v):
     ###########################################
     # find the video-gaze time offset
     ###########################################
-    mouseData = alldata[np.where(alldata.event=="mouse")]
-    mouseData = mouseData.view(np.recarray)
+    if mouseBasedTimeSync:
+        mouseData = alldata[np.where(alldata.event=="mouse")]
+        mouseData = mouseData.view(np.recarray)
 
-    print "mouseData data len = "+str(len(mouseData))
+        print "mouseData data len = "+str(len(mouseData))
 
-    txt=""; gazex=0; gazey=0; mousex=0; mousey=0
-    mouseVideoData =[]    
-    tmp = None
-    mvdStartTime = 0
+        txt=""; gazex=0; gazey=0; mousex=0; mousey=0
+        mouseVideoData =[]    
+        tmp = None
+        mvdStartTime = 0
 
-    if len(mouseData)>3:
-        while tmp is None:
-            # there is mouse data in the eventdata.
-            d = getMousePositionsFromVideo(video, windowName, nSamples=10, startTime=mvdStartTime)
-            [mouseVideoData.append(i) for i in d]
+        if len(mouseData)>3:
+            while tmp is None:
+                # there is mouse data in the eventdata.
+                d = getMousePositionsFromVideo(video, windowName, nSamples=10, startTime=mvdStartTime)
+                [mouseVideoData.append(i) for i in d]
 
-            # now we turn mosueVideoData into a numpy record array
-            mvd = np.array(mouseVideoData, dtype=[('t',int), ('x', int), ('y', int)])
-            mvd = mvd.view(np.recarray)
-            # next round starts 1sec after the last mouse sighting
-            mvdStartTime = np.max(mvd.t) + 1000
+                # now we turn mosueVideoData into a numpy record array
+                mvd = np.array(mouseVideoData, dtype=[('t',int), ('x', int), ('y', int)])
+                mvd = mvd.view(np.recarray)
+                # next round starts 1sec after the last mouse sighting
+                mvdStartTime = np.max(mvd.t) + 1000
 
-            # find the offset
-            tmp= findGazeVideoOffset(mouseData, mvd, 4, 250)
-            print "findGazeVideoOffset returns {} based on {} observations".format(tmp, len(mouseVideoData))
-            logging.info( "findGazeVideoOffset returns {}".format(tmp))
+                # find the offset
+                tmp= findGazeVideoOffset(mouseData, mvd, 4, 250)
+                print "findGazeVideoOffset returns {} based on {} observations".format(tmp, len(mouseVideoData))
+                logging.info( "findGazeVideoOffset:\t{}".format(tmp))
 
-    # now set the global toffset
-    toffset = tmp if tmp is not None else toffset
-    # clear the AOIs
-    initAOIList()
-    ###########################################
+        # now set the global toffset
+        toffset = tmp if tmp is not None else toffset
+        # clear the AOIs
+        initAOIList()
+    ##########################
 
-    # get the AOI shift and scale parameters
-    tmp = getVideoScalingFactors(video)
-    (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
-
-
+    # read signature image files for template matching
+    p2YAML(yamlconfig["tasks"], p2ReadSignatureImage)
+    
     # resize the signature images
-    resizeSignatureImages(aoiScaleX, aoiScaleY)
+    resizeSignatureImages(aoiScaleX, aoiScaleY, signatureImageDict)
+    # resize the AOIs
+    #resizeAOIs(aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY)
 
     # remap gaze and mouse data using the shift/scale parameters
     # we will also reshape the video frame to 'standardize'
@@ -1078,7 +1440,7 @@ def processVideo(v):
 def main():
     ''' Main function that processes arguments and gets things started. '''
     global yamlconfig, tess, parser, frameEngine, startFrame, showVideo, jumpAhead
-    global txt, toffset, skimmingMode, logLevel, testMode, outputLogFileSuffix
+    global txt, toffset, skimmingMode, logLevel, testMode, outputLogFileSuffix, mouseBasedTimeSync
 
     # Get command line arguments
     parser = argparse.ArgumentParser(
@@ -1112,6 +1474,10 @@ def main():
                         help='If true, no output; for testing only.',
                         choices=['T', 'F'],
                         default='F')
+    parser.add_argument('-m', '--mouseBasedTimeSync',
+                        help='Whether to use the mouse to sync gaze and video data.',
+                        choices=['T', 'F'],
+                        default='T')
     parser.add_argument('-s', '--outputLogFileSuffix',
                         help='Suffix for the output log file.',
                         default='ignore')
@@ -1188,6 +1554,9 @@ def main():
     
     # testmode
     testMode = True if (args.testingMode is "T") else False
+
+    # mouse
+    mouseBasedTimeSync = True if (args.mouseBasedTimeSync is "T") else False
 
     #print "Loglevel: INFO={} DEBUG={}; current setting is {}={}".format(logging.INFO, logging.DEBUG, args.logLevel, logLevel)
     print "INFO: startFrame: {}; jumpAhead={}; toffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
