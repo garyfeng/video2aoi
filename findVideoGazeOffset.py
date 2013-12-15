@@ -17,6 +17,7 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     temporalThreshold is the parameter for the search window. 
 
     '''
+    logging.getLogger('')
 
     if not isinstance(mouseLog, np.ndarray):
         logging.error( "Error findVideoGazeOffset(): mouseLog is not a numpy array")
@@ -81,6 +82,7 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     else:
         t = None   
     #print "t= {}".format(t)
+    logging.info("findVideoGazeOffset\t{}").format(t)
     return t
 
 
