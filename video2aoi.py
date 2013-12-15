@@ -15,7 +15,10 @@ from FrameEngine import *    #FrameEngine
 
 import yaml
 
+from video2aoiUtils import *
+#from video2aoiUtils_signatureImages import *
 from findVideoGazeOffset import *
+
     
 ##################
 # functions
@@ -246,27 +249,6 @@ def findLastMatchOffset(context):
     # otherwise return the real deal
     return None if offset[0] == -9999 else offset
 
-def getColorPlane():
-    '''Returns the color plane code specified in the YAML file
-    :returns: the color plane: default = -99 = all colors; 0 = Blue; 1=Green, 2=Red; -1 = something wrong
-
-    '''
-    #global yamlconfig
-
-    colorPlane = -99; #use all colors
-    if "useGrayscaleImage" in yamlconfig["study"].keys() and yamlconfig["study"]["useGrayscaleImage"]==True:
-        colorPlane = -1
-    elif "useColorChannel" in yamlconfig["study"].keys():
-        if yamlconfig["study"]["useColorChannel"] == "B":
-            colorPlane = 0
-        elif yamlconfig["study"]["useColorChannel"] == "G":
-            colorPlane = 1
-        elif yamlconfig["study"]["useColorChannel"] == "R":
-            colorPlane = 2
-        else:
-            colorPlane = -1
-    logging.info("ColorPlane = "+str(colorPlane))
-    return colorPlane    
 
 def readEventData(basename):
     ''' read the event log file as specified in basename and suffix in the yaml file.
@@ -322,6 +304,8 @@ def readEventData(basename):
     # process all the data, separate gaze/key/mouse events    
     alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
     return alldata
+
+
 def getCurrentAOIs (aoilist, vTime, lastVTime=0):
     '''take the global AOI lise, a vTime, and a lastvTime, and return a list of the AOIs that are right before vTime, 
         as a numpy record array
@@ -574,16 +558,18 @@ def displayFrame(windowName, aoiLastVTime=100):
 
 # funcs to process the YAML config file
 signatureImageDict={}
+
 def p2ReadSignatureImage(k, value, c):
     '''Takes a key, a value (file name), and a context, and reads the image if key="match" or "track"
     then updates the global dict signatureImageDict'''
     global signatureImageDict, yamlconfig
     
+    logging.getLogger('')
+
     if not isinstance(value, dict):
         # not a dict, no need to process
         return True
     
-
     # use the same YAML parsing method as p2Task()
     img = None
     if "match" in value:
@@ -596,7 +582,7 @@ def p2ReadSignatureImage(k, value, c):
         return True
 
     # set colorplane choices
-    colorPlane = getColorPlane()
+    colorPlane = getColorPlane(yamlconfig)
 
     fname = para[0]
     if not isinstance(fname, str): 
@@ -1244,7 +1230,7 @@ def processVideo(v):
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
     lastCounter=0; lastVTime=0;
     # set colorplane choices
-    colorPlane = getColorPlane()
+    colorPlane = getColorPlane(yamlconfig)
 
     ##########################################
     # now test to see if the AOIs need to be scaled
