@@ -33,14 +33,10 @@ def initAOIList ():
     #aoilist = np.array(aoilist, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
     #aoilist = aoilist.view(np.recarray)
 
-def updateAOI (data, forcedResizable=False):
+def updateAOI (data):
     ''' This function takes a tuple with 9 elements and append it to the global aoilist[].
 
     :param Data: (basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
-    :param forcedResizable: optional parameter, whether the AOI will be resized in logEvents(). This
-        is useful when some of the predefined AOIs may need to be resized depending on the 
-        current video frame, whereas others should not be, e.g., AOIs for OCR output, because
-        they come from the current frame. 
     :returns: True if no error else False. 
 
     '''
@@ -60,10 +56,10 @@ def updateAOI (data, forcedResizable=False):
     # scale aois
     x1 =data[5]; y1=data[6]; x2=data[7]; y2=data[8]
 
-    resizable = isAOIResizable(data[3])
+    resizable = isAOIResizable(data[2])
     resizable = False if resizable is None else resizable
     if data[3].startswith("__MATCH__"): resizable = False
-    if forcedResizable: resizable = True
+    #if forcedResizable: resizable = True
 
     if resizable:
         x1=aoiShiftX + int((x1-aoiShiftX) * aoiScaleX)
@@ -90,7 +86,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
     mouseVideoData=[]
     # let's look into the video to see if we can template-match the mouse icon
     # read the mouse icon into the signatureImage list
-    p2ReadSignatureImage(None, {'match':mouseTemplateName}, None)
+    p2ReadSignatureImage('mouseTemplateName', {'match':mouseTemplateName}, ['mouseTemplateName'])
     # this is slightly complicated because there may be a path added to the filename
     sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find(mouseTemplateName) >0]
     print "mouse signature len = {}".format(len(sig))
@@ -107,7 +103,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
             vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
             #print "vTime = {}".format(vTime)
             # match the mouse position, using a threshold
-            res = frameEngine.findMatch(frame, sig, 0.02)
+            res = frameEngine.findMatch(frame, sig['img'], 0.02)
             
             # add to mouseVideoData if it's position has changed
             if res is not None:
@@ -207,11 +203,12 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640),
             # display
             #if not displayFrame(windowName): exit(-1)
         # 
-        #print "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1))
         logging.debug( "getVideoScalingFactors: coordinates= {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
         shiftx = x1; shifty = y1
         scalex = 1 if x2==0 else (x2-x1)*1.0/TemplateSize[0]
         scaley = 1 if y2==0 else (y2-y1)*1.0/TemplateSize[1]
+
+        print "getVideoScalingFactors = {}".format((shiftx, shifty, scalex, scaley))
 
         # rewind the video
         video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
@@ -267,11 +264,11 @@ def isAOIResizable(aoiID):
 
     global aoilist
 
-    if context is None: 
-        logging.error("isAOIResizable: input context = '{}' is None".format(str(context)))
+    if aoiID is None: 
+        logging.error("isAOIResizable: input context = '{}' is None".format(str(aoiID)))
         return None
-    if not isinstance(context, str): 
-        logging.error()("isAOIResizable: input context = '{}' is not a string".format(str(context)))
+    if not isinstance(aoiID, str): 
+        logging.error()("isAOIResizable: input context = '{}' is not a string".format(str(aoiID)))
         return None
 
     # reverse context; must make a copy, or else it messes up the context
@@ -279,10 +276,10 @@ def isAOIResizable(aoiID):
 
     while len(c)>0:
         p = '/'.join(c)
-        s= [s for s in signatureImageDict if s['id']==p]
-        logging.debug('isAOIResizable: aoiID ="{}" p={} s={}'.format(aoiID, p, s))
-        if len(s)>0:
-            return s['resizable']
+        s= [signatureImageDict[s] for s in signatureImageDict if signatureImageDict[s]['id']==p]
+        logging.debug('isAOIResizable: aoiID ="{}" p={} s={}'.format(aoiID, p, s['id']))
+        if len(s)==1:
+            return s[0]['resizable']
         c.pop()
     # if not specified, default is false
     return False
@@ -431,7 +428,8 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     for a in currentAOIs:
         #logging.debug("logEvents: aoi page = {}".format(a["page"]))
         # if the page title starts with Assessment/items, then this is the page, and we exit this loop
-        if a["page"].startswith("Assessment/items"):
+        #if a["page"].startswith("Assessment/items"):
+        if "/items" in a["page"]:
             currItem = a["page"]
             logging.debug("logEvents: currItem = {}".format(currItem))
             break
@@ -493,7 +491,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         if "gaze" in e["event"]:
             # update gaze pos no matter what; missing data -> missing
             gazex =int(e["x"]); gazey =int(e["y"]); 
-        elif "mouse" in e["event"] and x>0 and y>0:
+        elif "mouse" in e["event"] and ox>0 and oy>0:
             # don't update mosue location if there is no mouse info in this frame
             mousex=int(e["x"]); mousey=int(e["y"]);
 
@@ -698,7 +696,7 @@ def resizeSignatureImages(aoiScaleX, aoiScaleY, signatureImageDict):
 
         logging.debug("resizeSignatureImages: ==> size={}".format(np.shape(sig['img'])))
         # for debugging only
-        cv2.imwrite(sig['fname']+"_resized.png", sig["img"])
+        # cv2.imwrite(sig['fname']+"_resized.png", sig["img"])
 
 def p2Task(k, value, context):
     '''A callback function for p2YAML(). It taks a list of keys (context) and a Value from the
@@ -854,7 +852,7 @@ def p2Task(k, value, context):
 
                 # ITDS hack: assuming nodes with this keyword are special. 
                 # if no match, we will put a JUNKSCREEN AOI; AOI not resizable
-                updateAOI((basename, vTime, str(fname), "NOMATCH", "NOMATCH", 0, 0, frame.shape[1], frame.shape[0]), resizable=False)
+                updateAOI((basename, vTime, str(fname), "NOMATCH", "NOMATCH", 0, 0, frame.shape[1], frame.shape[0]))
 
             return None
         # only proceed if Match succeeded
@@ -869,11 +867,11 @@ def p2Task(k, value, context):
         #@@@ this is a hack @@@ for ITDS only
         # set the destcoord of ALL other sigs to the location of this one, with the correct size
         # this is done only once, essentially, when the first sig is found. 
-        if sig['id'].startswith('Assessment/items'):
+        if "/items" in sig['id']:
             logging.debug("MATCH: Found signature={} destRange is '{}'".format(sig['id'], sig['destRange']))
             for f in signatureImageDict:
                 s=signatureImageDict[f]
-                if s['destRange'] is None and s['id'].startswith('Assessment/items'):
+                if s['destRange'] is None and "/items" in s['id']:
                     # do this hack on if destcoord is not specified
                     s['destRange'] = [sig['lastKnownPositionX'], sig['lastKnownPositionY'], sig['lastKnownPositionX']+s['w'], sig['lastKnownPositionY']+s['h']]
                     logging.debug("MATCH: signature={} destRange is set to '{}'".format(s['id'], s['destRange']))
@@ -886,7 +884,7 @@ def p2Task(k, value, context):
         coord[3]= h+ objoffset[1]
 
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-        updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
+        updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
     if "textMatch" in value:
         # as in         textMatch: 477, 120, 224, 42, "Proportional Punch"
@@ -938,8 +936,8 @@ def p2Task(k, value, context):
         # compare, stop if no match
         # we could use a less stringent, edit-distance-based approach in the future
         #if str(textMathKey) not in str(ocrtext):
-        #if str(textMathKey) not in str(ocrtext):
-        if str(ocrtext).find(str(textMathKey))<0 :
+        if str(textMathKey).replace(" ","") not in str(ocrtext).replace(" ",""):
+        #if str(ocrtext).find(str(textMathKey))<0 :
             logging.debug("textMatch: answerKey='{}' is not found in text='{}'".format(textMathKey, ocrtext))
             logging.debug("textMatch: ocrtext is of type {}, textMathKey is of type {}".format(type(ocrtext), type(textMathKey)))
             return None
@@ -961,7 +959,7 @@ def p2Task(k, value, context):
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor'
         logging.info("OriginalAOI\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
     if "relativeAOI" in value:
         # something like: relativeAOI: 0, 0, 785, 573
@@ -988,7 +986,7 @@ def p2Task(k, value, context):
         # output
         pageTitle = "/".join(context)
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
     if "ocr" in value: 
         coord = map(int, value["ocr"].split(","))   # in order x1, y1, x2, y2
@@ -1254,6 +1252,9 @@ def processVideo(v):
                 tmp= utilsOffset.findGazeVideoOffset(mouseData, mvd, 4, 250)
                 print "findGazeVideoOffset returns {} based on {} observations".format(tmp, len(mouseVideoData))
                 logging.info( "findGazeVideoOffset:\t{}".format(tmp))
+        else:
+            # not enough data
+            logging.info( "findGazeVideoOffset: Not enough original mouse data to estimate the delay")
 
         # now set the global toffset
         toffset = tmp if tmp is not None else toffset
