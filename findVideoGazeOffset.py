@@ -81,8 +81,14 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
         t = (sumG- sumV)/c
     else:
         t = None   
+    # if time offset is off by more than 5 seconds, then something is definitely wrong. Keep searching
+    if abs(t)>5000: 
+        logging.debug('findVideoGazeOffset: estimated t={} >|5000|'.format(t))
+        print 'findVideoGazeOffset: estimated t={} >|5000|'.format(t)
+        #t=None
+
     #print "t= {}".format(t)
-    logging.info("findVideoGazeOffset\t{}").format(t)
+    logging.info("findVideoGazeOffset\t{}".format(t))
     return t
 
 
