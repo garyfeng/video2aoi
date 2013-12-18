@@ -1,0 +1,729 @@
+# yaml for video2aoi.py
+# Gary Feng, 2013, Princeton, NJ
+
+# requires:
+#assert "tasks" in yamlconfig
+#assert "study" in yamlconfig
+#assert "Assessment" in yamlconfig"tasks"
+#assert "items" in yamlconfig"tasks""Assessment"
+
+# format:
+
+# aoi: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# ocr: followed by 4 integers, separated by spaces or commmas, 
+#       in the order of x1, y1, x2, y2, of the box to be ocr-ed
+#       or x, y, w, h, depending on the study-wide defintion of "aoiFormat"
+#       don't use () or [], etc.
+
+# break: specify this if you don't want to continue processing 
+#       the rest of **sibling** items 
+#       following the **successful** processing of the current entry
+#       doesn't matter if you specify True or False, so long as it appears
+
+# match: always followed by a image filename, followed by options:
+#       match: filename.png, 0.2, where 0.2 is the threshold for successful matching (normalized sqdiff)
+#       #sourceLoc: x, y, w, h, or x1, y1, x2, y2, depending on "aoiFormat" 
+#           this specifies the subimage that will be used as the signature. 
+#           and by default, match will first tries to do a image match at this location in the dest image
+#           if this fails, it will do an exhaustive template matching
+#       unmatchLog: string to log in the case of unmatch; use this carefully
+#       currently we do a template match. 
+#       @@ we should consider a feature-based or a color-histgram method, 
+#       which may be faster and allow for Bayesian decisions on best matches
+
+# study-wide parameters
+
+study:
+    studyName: ITDS_PPS_2013
+    startFrame: 1
+    scalingRatio: 0.5
+    # did a look at the distribution of frameChange in cbalm49.avi, and looks like 
+    # a value of 1 will get ~20 more check points than =3 but will surely catch 
+    # most false negatives. 
+    frameChangeThreshold: 1
+    # this the global parameter that can be fine-tuned
+    matchTemplateThreshold: 0.02
+    # for the skipping mode, # of seconds to skip in a greedy search
+    jumpAhead: 0.5 
+    # useGrayscaleImage: False
+    # useColorChannel: R
+    # videogazeoffset is how much the gaze is ahead of the video
+    videogazeoffset: -1500 
+    # where image files are; can be relative path from the current directory
+    imgFilePath: "ITDS_standard_sig"
+    # we have 2 formats for entering AOI coordinates
+    aoiFormat: "xywh"
+    #aoiFormat: "x1y1x2y2"
+
+    # Gaze/mouse Log file control
+    # if True, will  read gaze/mouse log files; if False, will do video processing only
+    processGazeLog: True
+    dataFileSuffix: "_eye.txt"
+    gazeProcessingScript: "eyelog2dat_iohub.awk"
+    datalogFileSuffix: "_eye.log"
+
+    # OCR output control
+    ocrLogText: True
+    # ocrLogHTML: False
+    # outputAOI: False
+
+    # Show AOIs on the video?
+    displayAOI: True
+
+    # log level debug: turn this on if you want to get a LOT of info in the log
+    # including frame by frame counts
+    logLevelDebug: False
+
+    # for getting the aoi rescaling and shifts in the case a different browser or video format was used
+    TemplateSize: 1184, 778
+    topLeftTemplateName: "TopLeftCorner.png"
+    bottomRightTemplateName: "lowerrightcorner.png" 
+    # the margines are: the x y of the real topleft corner in the toplefttemplate, 
+    # and the x y of the real bottomright corner of the bottomRightTemplateName (from top-left corner of the img)
+    TemplateMargins: 16,17,33,33
+
+
+items: &assessmentItems
+
+    PP0lIntro:
+        textMatch: 477, 120, 224, 42, "Proportional Punch"
+        0IntroLRTASKBAR:
+            relativeAOI: 0, 0, 1171, 62
+        0IntroLRTITLE:
+            relativeAOI: 0, 111, 1171, 68
+        0IntroLRINSTRUCTIONS:
+            relativeAOI: 0, 179, 1171, 95
+        0IntroLRPITCHER:
+            relativeAOI: 358, 274, 446, 396
+
+    PP0Dir:
+        textMatch: 630, 100, 460, 48, "A tool that simulates"
+        0DirLSIDE:
+            relativeAOI: -1, 62, 591, 708
+        0DirLSMTIMAGE:
+            relativeAOI: 37, 117, 509, 403
+        0DirRSIDE:
+            relativeAOI: 593, 68, 574, 701
+        0DirRDIRECTIONS:
+            relativeAOI: 593, 68, 574, 477
+
+    PPS3Intro:
+        textMatch: 350, 175, 470, 50, "Now we will look at recipes"
+        S3IntroLRINTRO:
+            relativeAOI: 58, 139, 1055, 522
+        S3IntroLRDIRECTIONS:
+            relativeAOI: 58, 139, 1055, 88
+        S3IntroLRPITCHER:
+            relativeAOI: 405, 227, 350, 395
+
+
+    PPS1Q1:
+        textMatch: 450, 0, 260, 65, "Question 1 of 3"
+        S1Q1LSIDE:
+            relativeAOI: -2, 60, 589, 710
+        S1Q1LDIRECTIONS:
+            relativeAOI: -2, 60, 589, 79
+        S1Q1LSMTITLE:
+            relativeAOI: -2, 139, 589, 82
+        S1Q1LSMIMAGE:
+            relativeAOI: 221, 221, 178, 461
+        S1Q1RSIDE:
+            relativeAOI: 590, 68, 580, 704
+        S1Q1RQUESTION:
+            relativeAOI: 590, 68, 580, 148
+        S1Q1RRESPONSE:
+            relativeAOI: 590, 216, 580, 113
+
+    PPS1Q2:
+        textMatch: 450, 0, 260, 65, "Question 2 of 3"
+        S1Q2LSIDE:
+            relativeAOI: 1, 60, 588, 711
+        S1Q2LDIRECTIONS:
+            relativeAOI: 1, 60, 588, 79
+        S1Q2LSMTITLE:
+            relativeAOI: -2, 139, 589, 82
+        S1Q2LSMIMAGE:
+            relativeAOI: 221, 221, 178, 461
+        S1Q2RSIDE:
+            relativeAOI: 590, 68, 580, 704
+        S1Q2RQUESTION:
+            relativeAOI: 590, 68, 580, 148
+        S1Q2RRESPONSE:
+            relativeAOI: 594, 212, 569, 118
+
+    PPS1Q3:
+        textMatch: 450, 0, 260, 65, "Question 3 of 3"
+        S1Q3LSIDE:
+            relativeAOI: 1, 60, 588, 711
+        S1Q3LDIRECTIONS:
+            relativeAOI: 1, 60, 588, 79
+        S1Q3LSMTITLE:
+            relativeAOI: -2, 139, 589, 82
+        S1Q3LSMIMAGE:
+            relativeAOI: 221, 221, 178, 461
+        S1Q3RSIDE:
+            relativeAOI: 594, 69, 576, 701
+        S1Q3RQUESTION:
+            relativeAOI: 594, 69, 576, 146
+        S1Q3RRESPONSE:
+            relativeAOI: 594, 215, 576, 120
+
+    PPS2Q1:
+        textMatch: 450, 0, 260, 65, "Question 1 of 7"
+        S2Q1LSIDE:
+            relativeAOI: -1, 61, 591, 709
+        S2Q1LWATERPITCHER:
+            relativeAOI: -1, 61, 591, 182
+        S2Q1LPUNCHPITCHER:
+            relativeAOI: -1, 243, 591, 419
+        S2Q1RSIDE:
+            relativeAOI: 594, 65, 574, 704
+        S2Q1RQUESTION:
+            relativeAOI: 594, 65, 574, 97
+        S2Q1RRESPONSE:
+            relativeAOI: 594, 162, 574, 128
+
+    PPS2Q2:
+        textMatch: 450, 0, 260, 65, "Question 2 of 7"
+        S2Q2LSIDE:
+            relativeAOI: 0, 60, 589, 710
+        S2Q2LDIRECTIONS:
+            relativeAOI: 0, 60, 589, 112
+        S2Q2LPITCHERA:
+            relativeAOI: 0, 170, 299, 458
+        S2Q2LPITCHERB:
+            relativeAOI: 299, 170, 287, 458
+        S2Q2RSIDE:
+            relativeAOI: 594, 66, 573, 705
+        S2Q2RQUESTION:
+            relativeAOI: 594, 66, 573, 79
+        S2Q2RRESPONSE:
+            relativeAOI: 594, 145, 573, 124
+
+    PPS2Q3:
+        textMatch: 450, 0, 260, 65, "Question 3 of 7"
+        S2Q3LSIDE:
+            relativeAOI: 0, 57, 588, 713
+        S2Q3LDIRECTIONS:
+            relativeAOI: 0, 63, 588, 109
+        S2Q3LPITCHERA:
+            relativeAOI: -3, 171, 296, 451
+        S2Q3LPITCHERB:
+            relativeAOI: 293, 171, 295, 451
+        S2Q3RSIDE:
+            relativeAOI: 593, 68, 574, 702
+        S2Q3RQUESTION:
+            relativeAOI: 593, 68, 574, 97
+        S2Q3RRESPONSE:
+            relativeAOI: 593, 165, 574, 321
+
+    PPS2Q4:
+        textMatch: 450, 0, 260, 65, "Question 4 of 7"
+        S2Q4LSIDE:
+            relativeAOI: -1, 58, 589, 711
+        S2Q4LDIRECTIONS:
+            relativeAOI: -1, 58, 589, 112
+        S2Q4LPITCHERA:
+            relativeAOI: -1, 170, 297, 470
+        S2Q4LPITCHERB:
+            relativeAOI: 296, 170, 293, 470
+        S2Q4RSIDE:
+            relativeAOI: 593, 67, 576, 705
+        S2Q4RDIRECTIONS:
+            relativeAOI: 593, 67, 576, 75
+        S2Q4RRESPONSE:
+            relativeAOI: 593, 142, 576, 132
+
+
+    PPS2Q5:
+        textMatch: 450, 0, 260, 65, "Question 5 of 7"
+        S2Q5LSIDE:
+            relativeAOI: -1, 58, 589, 711
+        S2Q5LDIRECTIONS:
+            relativeAOI: -1, 58, 589, 112
+        S2Q5LPITCHERA:
+            relativeAOI: -1, 170, 297, 470
+        S2Q5LPITCHERB:
+            relativeAOI: 296, 170, 293, 470
+        S2Q5RSIDE:
+            relativeAOI: 594, 67, 575, 704
+        S2Q5RQUESTION:
+            relativeAOI: 594, 67, 575, 97
+        S2Q5RRESPONSE:
+            relativeAOI: 594, 164, 575, 347
+
+
+    PPS2Q6:
+        textMatch: 450, 0, 260, 65, "Question 6 of 7"
+        S2Q6LSIDE:
+            relativeAOI: 0, 61, 589, 709
+        S2Q6LPITCHERC:
+            relativeAOI: 0, 120, 293, 546
+        S2Q6LPITCHERD:
+            relativeAOI: 293, 120, 294, 546
+        S2Q6RSIDE:
+            relativeAOI: 591, 65, 574, 704
+        S2Q6RQUESTION:
+            relativeAOI: 591, 65, 574, 177
+        S2Q6RRESPONSE:
+            relativeAOI: 591, 240, 571, 158
+
+
+    PPS2Q7:
+        textMatch: 450, 0, 260, 65, "Question 7 of 7"
+        S2Q7LSIDE:
+            relativeAOI: -1, 59, 587, 713
+        S2Q7LPITCHERC:
+            relativeAOI: -1, 112, 300, 531
+        S2Q7LPITCHERD:
+            relativeAOI: 299, 112, 286, 531
+        S2Q7RSIDE:
+            relativeAOI: 592, 68, 571, 702
+        S2Q7RDIRECTIONS:
+            relativeAOI: 592, 68, 571, 197
+        S2Q7RRESPONSE:
+            relativeAOI: 592, 265, 571, 154
+
+    PPS3Q1:
+        textMatch: 450, 0, 260, 65, "Question 1 of 15"
+        S3Q1LSIDE:
+            relativeAOI: 0, 58, 589, 708
+        S3Q1LDIRECTIONS:
+            relativeAOI: 0, 58, 589, 107
+        S3Q1LTABLE:
+            relativeAOI: 0, 186, 589, 281
+        S3Q1RSIDE:
+            relativeAOI: 591, 66, 575, 705
+        S3Q1RQUESTION:
+            relativeAOI: 591, 66, 575, 77
+        S3Q1RRESPONSE:
+            relativeAOI: 591, 143, 575, 128
+
+
+    PPS3Q2:
+        textMatch: 450, 0, 260, 65, "Question 2 of 15"
+        S3Q2LSIDE:
+            relativeAOI: -1, 60, 587, 708
+        S3Q2LDIRECTIONS:
+            relativeAOI: -1, 64, 588, 98
+        S3Q2LTABLE:
+            relativeAOI: 98, 185, 389, 283
+        S3Q2RSIDE:
+            relativeAOI: 593, 65, 575, 706
+        S3Q2RQUESTION:
+            relativeAOI: 593, 65, 575, 96
+        S3Q2RRESPONSE:
+            relativeAOI: 593, 161, 575, 400
+
+    PPS3Q3:
+        textMatch: 450, 0, 260, 65, "Question 3 of 15"
+        S3Q3LSIDE:
+            relativeAOI: -1, 60, 588, 711
+        S3Q3LDIRECTIONS:
+            relativeAOI: -1, 60, 588, 120
+        S3Q3LTABLE:
+            relativeAOI: 98, 205, 387, 372
+        S3Q3RSIDE:
+            relativeAOI: 593, 67, 575, 702
+        S3Q3RQUESTION:
+            relativeAOI: 593, 67, 575, 76
+        S3Q3RRESPONSE:
+            relativeAOI: 593, 143, 575, 121
+
+
+    PPS3Q4:
+        textMatch: 450, 0, 260, 65, "Question 4 of 15"
+        S3Q4LSIDE:
+            relativeAOI: -2, 58, 591, 713
+        S3Q4LDIRECTIONS:
+            relativeAOI: -2, 58, 591, 121
+        S3Q4LTABLE:
+            relativeAOI: 98, 204, 388, 370
+        S3Q4RSIDE:
+            relativeAOI: 594, 66, 572, 703
+        S3Q4RQUESTION:
+            relativeAOI: 594, 66, 572, 95
+        S3Q4RRESPONSE:
+            relativeAOI: 594, 161, 572, 331
+
+
+    PPS3Q5:
+        textMatch: 450, 0, 260, 65, "Question 5 of 15"
+        S3Q5LSIDE:
+            relativeAOI: -1, 58, 584, 712
+        S3Q5LDIRECTIONS:
+            relativeAOI: -1, 58, 584, 102
+        S3Q5LTABLE:
+            relativeAOI: 100, 182, 387, 285
+        S3Q5RSIDE:
+            relativeAOI: 593, 71, 576, 698
+        S3Q5RQUESTION:
+            relativeAOI: 593, 71, 576, 70
+        S3Q5RRESPONSE:
+            relativeAOI: 593, 141, 576, 124
+
+
+    PPS3Q6:
+        textMatch: 450, 0, 260, 65, "Question 6 of 15"
+        S3Q6LSIDE:
+            relativeAOI: -1, 62, 586, 708
+        S3Q6LDIRECTIONS:
+            relativeAOI: -1, 62, 586, 101
+        S3Q6LTABLE:
+            relativeAOI: 100, 182, 388, 284
+        S3Q6RSIDE:
+            relativeAOI: 593, 65, 574, 705
+        S3Q6RQUESTION:
+            relativeAOI: 593, 65, 574, 104
+        S3Q6RRESPONSE:
+            relativeAOI: 593, 169, 574, 294
+
+
+    PPS3Q7:
+        textMatch: 450, 0, 260, 65, "Question 7 of 15"
+        S3Q7LSIDE:
+            relativeAOI: 1, 58, 587, 711
+        S3Q7LDIRECTIONS:
+            relativeAOI: 27, 107, 530, 103
+        S3Q7RSIDE:
+            relativeAOI: 592, 65, 574, 704
+        S3Q7RINSTRUCTIONS:
+            relativeAOI: 592, 65, 574, 85
+        S3Q7RRESPONSETABLE:
+            relativeAOI: 592, 150, 574, 227
+        S3Q7RDESCRIBE:
+            relativeAOI: 592, 377, 574, 35
+        S3Q7RDESCRIBE1:
+            relativeAOI: 592, 412, 574, 101
+        S3Q7RDESCRIBE2:
+            relativeAOI: 592, 513, 574, 130
+
+
+    PPS3Q8:
+        textMatch: 450, 0, 260, 65, "Question 8 of 15"
+        S3Q8LSIDE:
+            relativeAOI: -1, 61, 590, 709
+        S3Q8LPITCHER:
+            relativeAOI: 132, 207, 320, 390
+        S3Q8RSIDE:
+            relativeAOI: 589, 69, 581, 701
+        S3Q8RQUESTION:
+            relativeAOI: 589, 69, 581, 146
+        S3Q8RRESPONSE:
+            relativeAOI: 589, 215, 581, 412
+
+
+    PPS3Q9:
+        textMatch: 450, 0, 260, 65, "Question 9 of 15"
+        S3Q9LSIDE:
+            relativeAOI: -1, 61, 590, 709
+        S3Q9LTABLE:
+            relativeAOI: 22, 106, 539, 431
+        S3Q9RSIDE:
+            relativeAOI: 589, 69, 581, 701
+        S3Q9RQSPART1:
+            relativeAOI: 623, 111, 497, 128
+        S3Q9RQSPART2:
+            relativeAOI: 623, 239, 497, 135
+        S3Q9RQSPART3:
+            relativeAOI: 623, 374, 497, 80
+        S3Q9RRESPONSE:
+            relativeAOI: 623, 454, 497, 140
+
+
+    PPS3Q10:
+        textMatch: 450, 0, 260, 65, "Question 10 of 15"
+        S3Q10LSIDE:
+            relativeAOI: -1, 61, 590, 709
+        S3Q10LTABLE:
+            relativeAOI: 24, 107, 537, 431
+        S3Q10RSIDE:
+            relativeAOI: 589, 69, 581, 701
+        S3Q10RQSPART1:
+            relativeAOI: 594, 79, 570, 145
+        S3Q10RQSPART2:
+            relativeAOI: 594, 224, 570, 153
+        S3Q10RQSPART3:
+            relativeAOI: 594, 377, 570, 84
+        S3Q10RRESPONSE:
+            relativeAOI: 594, 461, 570, 120
+        S3Q10RRESPONSE:
+            relativeAOI: 594, 461, 570, 120
+
+
+    PPS3Q11:
+        textMatch: 450, 0, 260, 65, "Question 11 of 15"
+        S3Q11LSIDE:
+            relativeAOI: -1, 61, 590, 709
+        S3Q11LTABLE:
+            relativeAOI: 53, 108, 538, 431
+        S3Q11RSIDE:
+            relativeAOI: 594, 68, 574, 699
+        S3Q11RQSPART1:
+            relativeAOI: 594, 68, 574, 165
+        S3Q11RQSPART2:
+            relativeAOI: 594, 233, 574, 136
+        S3Q11RQSPART3:
+            relativeAOI: 594, 369, 574, 115
+        S3Q11RRESPONSE:
+            relativeAOI: 594, 469, 574, 150
+
+
+    PPS3Q12:
+        textMatch: 450, 0, 260, 65, "Question 12 of 15"
+        S3Q12LSIDE:
+            relativeAOI: -3, 59, 592, 709
+        S3Q12LTABLE:
+            relativeAOI: 143, 94, 294, 259
+        S3Q12LJUG:
+            relativeAOI: 181, 378, 221, 294
+        S3Q12RSIDE:
+            relativeAOI: 594, 68, 574, 699
+        S3Q12RQSPART1:
+            relativeAOI: 594, 79, 569, 117
+        S3Q12RQSPART2:
+            relativeAOI: 594, 196, 569, 92
+        S3Q12RQSPART3:
+            relativeAOI: 594, 288, 569, 64
+        S3Q12RRESPONSE:
+            relativeAOI: 594, 352, 569, 86
+
+
+    PPS3Q13:
+        textMatch: 450, 0, 260, 65, "Question 13 of 15"
+        S3Q13LSIDE:
+            relativeAOI: -3, 59, 592, 709
+        S3Q13LTABLE:
+            relativeAOI: 143, 94, 294, 259
+        S3Q13LJUG:
+            relativeAOI: 181, 378, 221, 294
+        S3Q13RQSPART1:
+            relativeAOI: 594, 79, 569, 117
+        S3Q13RQSPART2:
+            relativeAOI: 594, 196, 569, 92
+        S3Q13RQSPART3:
+            relativeAOI: 594, 301, 571, 68
+        S3Q13RRESPONSE:
+            relativeAOI: 594, 369, 571, 82
+        S3Q13RRESPONSE:
+            relativeAOI: 594, 369, 571, 82
+
+
+    PPS3Q14:
+        textMatch: 450, 0, 260, 65, "Question 14 of 15"
+        S3Q14LSIDE:
+            relativeAOI: -3, 59, 592, 709
+        S3Q14LTABLE:
+            relativeAOI: 143, 94, 294, 259
+        S3Q14LJUG:
+            relativeAOI: 181, 378, 221, 294
+        S3Q14RSIDE:
+            relativeAOI: 595, 69, 576, 700
+        S3Q14RQSPART1:
+            relativeAOI: 595, 69, 576, 125
+        S3Q14RQSPART2:
+            relativeAOI: 595, 194, 576, 98
+        S3Q14RQSPART3:
+            relativeAOI: 595, 292, 576, 68
+        S3Q14RRESPONSE:
+            relativeAOI: 595, 360, 576, 79
+
+
+    PPS3Q15:
+        textMatch: 450, 0, 260, 65, "Question 15 of 15"
+        S3Q15LSIDE:
+            relativeAOI: -3, 59, 592, 709
+        S3Q15LTABLE:
+            relativeAOI: 143, 94, 294, 259
+        S3Q15LJUG:
+            relativeAOI: 181, 378, 221, 294
+        S3Q15RSIDE:
+            relativeAOI: 595, 69, 576, 700
+        S3Q15RQSPART1:
+            relativeAOI: 595, 69, 576, 125
+        S3Q15RQSPART2:
+            relativeAOI: 595, 194, 576, 98
+        S3Q15RQSPART3:
+            relativeAOI: 595, 292, 576, 68
+        S3Q15RRESPONSE:
+            relativeAOI: 595, 360, 576, 79
+
+
+    PPS4Q1:
+        textMatch: 450, 0, 260, 65, "Question 1 of 6"
+        S4Q1LSIDE:
+            relativeAOI: -1, 61, 591, 709
+        S4Q1LRESPONSETABLE:
+            relativeAOI: 50, 113, 487, 469
+        S4Q1RSIDE:
+            relativeAOI: 594, 68, 575, 703
+        S4Q1RDIRECTIONS:
+            relativeAOI: 594, 68, 575, 141
+
+
+    PPS4Q2:
+        textMatch: 450, 0, 260, 65, "Question 2 of 6"
+        S4Q2LSIDE:
+            relativeAOI: -1, 61, 591, 709
+        S4Q2LRESPONSETABLE:
+            relativeAOI: 50, 113, 487, 437
+        S4Q2RSIDE:
+            relativeAOI: 588, 69, 583, 700
+        S4Q2RSPART1:
+            relativeAOI: 588, 69, 583, 90
+        S4Q2RQSPART2:
+            relativeAOI: 588, 159, 583, 87
+        S4Q2RQSPART3:
+            relativeAOI: 588, 246, 583, 105
+        S4Q2RRESPONSE:
+            relativeAOI: 588, 351, 583, 84
+
+
+    PPS4Q3:
+        textMatch: 450, 0, 260, 65, "Question 3 of 6"
+        S4Q3LSIDE:
+            relativeAOI: -1, 61, 591, 709
+        S4Q3LTABLE:
+            relativeAOI: 50, 113, 487, 437
+        S4Q3RSIDE:
+            relativeAOI: 594, 69, 575, 697
+        S4Q3RQSPART1:
+            relativeAOI: 594, 69, 575, 95
+        S4Q3RQSPART2:
+            relativeAOI: 594, 164, 575, 79
+        S4Q3RQSPART3:
+            relativeAOI: 594, 243, 575, 118
+        S4Q3RRESPONSE:
+            relativeAOI: 594, 361, 575, 86
+
+
+    PPS4Q4:
+        textMatch: 450, 0, 260, 65, "Question 4 of 6"
+        S4Q4LSIDE:
+            relativeAOI: -1, 61, 591, 709
+        S4Q4LTABLE:
+            relativeAOI: 50, 113, 487, 437
+        S4Q4RSIDE:
+            relativeAOI: 594, 69, 575, 697
+        S4Q4RQSPART1:
+            relativeAOI: 594, 78, 569, 83
+        S4Q4RQSPART2:
+            relativeAOI: 594, 161, 569, 84
+        S4Q4RQSPART3:
+            relativeAOI: 594, 245, 569, 84
+        S4Q4RRESPONSE:
+            relativeAOI: 594, 329, 569, 85
+
+
+    PPS4Q5:
+        textMatch: 450, 0, 260, 65, "Question 5 of 6"
+        S4Q5LRTOTAL:
+            relativeAOI: 19, 76, 1134, 678
+        S4Q5LRQUESTION:
+            relativeAOI: 19, 76, 1134, 67
+        S4Q5LRTABLE1:
+            relativeAOI: 202, 143, 366, 214
+        S4Q5LRTABLE2:
+            relativeAOI: 601, 143, 368, 214
+        S4Q5LRRESPONSEWHY:
+            relativeAOI: 18, 359, 1136, 326
+
+
+    PPS4Q6:
+        textMatch: 450, 0, 260, 65, "Question 6 of 6"
+        S4Q6LRTOTAL:
+            relativeAOI: 19, 76, 1134, 678
+        S4Q6LRDIRECTIONS:
+            relativeAOI: 18, 76, 602, 57
+        S4Q6LQUESTIONA:
+            relativeAOI: 38, 145, 532, 75
+        S4Q6LQSASHOW:
+            relativeAOI: 38, 220, 532, 285
+        S4Q6RQUESTIONB:
+            relativeAOI: 590, 145, 535, 74
+        S4Q6RQSBSHOW:
+            relativeAOI: 590, 219, 535, 285
+
+
+tasks:
+    # Simulation:
+    #     match: simusig.png, 0.02
+    #     #threshold: 0.01
+    #     # where to search
+    #     destRange: 0, 0, 1920, 1080
+    #     relativeAOI: 0, 0, 785, 573
+    #     log: SimulationToolActivated
+    #     SIMULATIONSTAGE:
+    #         relativeAOI: 46, 111, 552, 312
+    #     SIMULATIONCONTROLS:
+    #         relativeAOI: 46, 422, 552, 123
+    #     SIMULATIONBUTTONS:
+    #         relativeAOI: 616, 166, 122, 186
+    #     #break: true
+    # CalculatorIE:
+    #     match: calcsig_IE.png, 0.03
+    #     destRange: 0, 0, 1920, 1080
+    #     #threshold: 0.01
+    #     relativeAOI: 0, 0, 260, 262
+    #     log: CalculatorToolActivated
+
+    CalculatorFF:
+        match: calcsig_FF.png, 0.03
+        destRange: 0, 0, 1920, 1080
+        #threshold: 0.01
+        relativeAOI: 0, 0, 253, 322
+        log: CalculatorToolActivated
+
+    SweetnessMeter:
+        match: SweetnessMeterSig.png, 0.02
+        resizable: False
+        relativeAOI: 0, 0, 750, 470
+        SweetnessMeterTitle:
+            relativeAOI: 0, 0, 375, 80
+        SweetnessMeterMeter:
+            relativeAOI: 0, 81, 160, 387
+        SweetnessMeterAddButtons:
+            relativeAOI: 161, 81, 213, 200
+        SweetnessMeterStartOverButton:
+            relativeAOI:  161, 282, 213, 187
+        SweetnessMeterAnimationCupScoop:
+            relativeAOI: 376, 0, 375, 145
+        SweetnessMeterAnimationPitcher:
+            relativeAOI: 376, 146, 375, 325
+
+    Assessment:
+        #match: CBALM_sig.png, 0.01
+        match: CBAL.png
+        #sourceLoc: 920, 275, 212, 69
+        # destRange: 000, 000, 1920, 1080
+        unmatchLog: Assessment signature not found
+        resizable: True
+        #ocr: 450, 0, 260, 65
+        # log: taskName='assessment'
+        # ocr: 617, 281 ,49, 16
+        # the CBAL standard tool bars
+        # TOOLBARLEFT:
+        #     aoi: 450, 245, 308, 67
+        # TOOLBARMID:
+        #     aoi: 757, 245, 383, 67
+        # TOOLBARRIGHT:
+        #     aoi: 1140, 245, 331, 67
+        items: *assessmentItems
+
+    Assessment2:
+        match: CBAL2.png
+        unmatchLog: Assessment signature not found
+        resizable: True
+        items: *assessmentItems
+
+    Assessment3:
+        match: CBAL3.png
+        unmatchLog: Assessment signature not found
+        resizable: True
+        items: *assessmentItems
+
+
