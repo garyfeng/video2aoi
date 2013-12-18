@@ -277,7 +277,7 @@ def isAOIResizable(aoiID):
     while len(c)>0:
         p = '/'.join(c)
         s= [signatureImageDict[s] for s in signatureImageDict if signatureImageDict[s]['id']==p]
-        logging.debug('isAOIResizable: aoiID ="{}" p={} s={}'.format(aoiID, p, s['id']))
+        logging.debug('isAOIResizable: aoiID ="{}" p={} s={}'.format(aoiID, p, s if len(s)==0 else s[0]['id']))
         if len(s)==1:
             return s[0]['resizable']
         c.pop()
