@@ -33,10 +33,15 @@ def initAOIList ():
     #aoilist = np.array(aoilist, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
     #aoilist = aoilist.view(np.recarray)
 
-def updateAOI (data):
+def updateAOI (data, forcedResizable=False):
     ''' This function takes a tuple with 9 elements and append it to the global aoilist[].
 
     :param Data: (basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
+    :param forcedResizable: optional parameter, whether the AOI will be resized in logEvents(). This
+        is useful when some of the predefined AOIs may need to be resized depending on the 
+        current video frame, whereas others should not be, e.g., AOIs for OCR output, because
+        they come from the current frame. 
+    :returns: True if no error else False. 
 
     '''
 
@@ -44,7 +49,7 @@ def updateAOI (data):
     
     if type(data)!=tuple or len(data)!=9:
         print "Error in UpdateAOI: data = "+str(data)
-        return
+        return False
         
     # here we enforce that the item name is in the "page" field
     # data[0]=data[0].replace("Assessment/items", "")
@@ -55,15 +60,22 @@ def updateAOI (data):
     # scale aois
     x1 =data[5]; y1=data[6]; x2=data[7]; y2=data[8]
 
-    if not data[3].startswith("__MATCH__"):
+    resizable = isAOIResizable(data[3])
+    resizable = False if resizable is None else resizable
+    if data[3].startswith("__MATCH__"): resizable = False
+    if forcedResizable: resizable = True
+
+    if resizable:
         x1=aoiShiftX + int((x1-aoiShiftX) * aoiScaleX)
         x2=aoiShiftX + int((x2-aoiShiftX) * aoiScaleX)
         y1=aoiShiftY + int((y1-aoiShiftY) * aoiScaleY)
         y2=aoiShiftY + int((y2-aoiShiftY) * aoiScaleY)
 
-    data=(data[0], data[1], data[2], data[3], data[4], x1, y1, x2, y2)
+    data=(data[0], data[1], data[2], data[3], data[4], x1, y1, x2, y2, resizable)
 
     aoilist.append(data)
+
+    return True
 
     # tried to use numpy array for aoilist but found out that numpy is not efficent
     # in appending rows ... it requires realloc memory, etc. And it crashes easily
@@ -128,7 +140,6 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
         return None
     # mouseVideoData can be shorter than nSamples if the video ends
     return mouseVideoData
-
 
 def getVideoScalingFactors (video, TemplateSize = (1024, 640),
                             topLeftTemplateName ="TopLeftCorner.png", 
@@ -232,11 +243,6 @@ def findLastMatchOffset(context):
     offset=[-9999, -9999]
     #contextLen = 0
 
-    # # get the AOIs on the current page
-    # currentAOIs = [a for a in aoilist if a[1]== vTime]
-    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    # currentAOIs = currentAOIs.view(np.recarray)
-
     currentAOIs = getCurrentAOIs(aoilist, vTime)
 
     for d in currentAOIs:
@@ -252,6 +258,34 @@ def findLastMatchOffset(context):
     # otherwise return the real deal
     return None if offset[0] == -9999 else offset
 
+def isAOIResizable(aoiID):
+    '''Check if somewhere in the current AOI path (context) the AOI was set to be 'resizable'.
+    :param aoiID: a path such as "Assessment/items/Page1/Question1"
+    :returns: True if the last sig along the path was set to resizable: True or False (default); None if error occurs
+
+    '''
+
+    global aoilist
+
+    if context is None: 
+        logging.error("isAOIResizable: input context = '{}' is None".format(str(context)))
+        return None
+    if not isinstance(context, str): 
+        logging.error()("isAOIResizable: input context = '{}' is not a string".format(str(context)))
+        return None
+
+    # reverse context; must make a copy, or else it messes up the context
+    c = aoiID.split('/') 
+
+    while len(c)>0:
+        p = '/'.join(c)
+        s= [s for s in signatureImageDict if s['id']==p]
+        logging.debug('isAOIResizable: aoiID ="{}" p={} s={}'.format(aoiID, p, s))
+        if len(s)>0:
+            return s['resizable']
+        c.pop()
+    # if not specified, default is false
+    return False
 
 def readEventData(basename):
     ''' read the event log file as specified in basename and suffix in the yaml file.
@@ -308,7 +342,6 @@ def readEventData(basename):
     alldata = alldata.view(np.recarray)    # now you can refer to gaze.x[100]
     return alldata
 
-
 def getCurrentAOIs (aoilist, vTime, lastVTime=0):
     '''take the global AOI lise, a vTime, and a lastvTime, and return a list of the AOIs that are right before vTime, 
         as a numpy record array
@@ -324,7 +357,10 @@ def getCurrentAOIs (aoilist, vTime, lastVTime=0):
     tlist = [a[1] for a in aoilist if a[1] <= vTime and a[1]>=lastVTime]
     lastTime = max(tlist) if len(tlist)>0 else vTime
     currentAOIs = [a for a in aoilist if a[1]== lastTime]
-    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
+    currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), 
+        ('page', 'S80'), ('id', 'S80'), ('content','S80'), 
+        ('x1',int), ('y1',int), ('x2',int), ('y2',int), 
+        ('resizable',bool)])
     currentAOIs = currentAOIs.view(np.recarray)
 
     return currentAOIs
@@ -337,19 +373,23 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
     The current version still uses some global vars. These can be eliminted if we switch to a Class AOI
 
-    :returns: True if all goes well, or False if something is wrong.
     :param allevents:  of the format names=['t', 'event', 'x', 'y', 'info']
-    :param aoilist: of the format  dtype=[('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)]
+    :param aoilist: of the format dtype=[('basename', 'S40'), ('t', int), 
+        ('page', 'S80'), ('id', 'S80'), ('content','S80'), 
+        ('x1',int), ('y1',int), ('x2',int), ('y2',int), 
+        ('resizable',bool)]
     :param lastVTime: integer timestamp of the beginning time
     :param vTime: integer timestamp of the end time from which the gaze/mouse samples will be logged
     :param tOffset: [default = 0] the offset between gaze and video, used to reconstruct the precise videoTime after skipping; 
         Note that vTime for skipped frames is from the last non-skipped frame; we have to use the delta-time from the gazetime 
         to recalcualte the actual vTime.
+    :returns: True if all goes well, or False if something is wrong.
+
     '''
 
     # not the best idea but we need to keep track of these for displaying the gaze data. 
     # unless we want to re-calculate these every time
-    global gazex, gazey, mousex, mousey, activeAOI
+    global gazex, gazey, mousex, mousey #, activeAOI
 
     if len(allevents)==0: 
         logging.error("logEvents: no event data")
@@ -365,18 +405,13 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     gazex=-32768; gazey=-32768;
 
     # # get the AOIs on the current page
-    # currentAOIs = [a for a in aoilist if a[1]== vTime]
-    # # converting aoilist from a list of numpy array
-    # # is this even necessary?
-    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    # currentAOIs = currentAOIs.view(np.recarray)
-
     currentAOIs = getCurrentAOIs(aoilist, vTime)
     # scale the AOI back to the standardized, centering at the top-left corner
-    currentAOIs.x1 = ((currentAOIs.x1 - aoiShiftX)/ aoiScaleX ).astype(int)
-    currentAOIs.y1 = ((currentAOIs.y1 - aoiShiftY)/ aoiScaleY ).astype(int)
-    currentAOIs.x2 = ((currentAOIs.x2 - aoiShiftX)/ aoiScaleX ).astype(int)
-    currentAOIs.y2 = ((currentAOIs.y2 - aoiShiftY)/ aoiScaleY ).astype(int)
+    # but only if they are resizable
+    currentAOIs.x1[currentAOIs.resizable] = ((currentAOIs.x1[currentAOIs.resizable] - aoiShiftX)/ aoiScaleX ).astype(int)
+    currentAOIs.y1[currentAOIs.resizable] = ((currentAOIs.y1[currentAOIs.resizable] - aoiShiftY)/ aoiScaleY ).astype(int)
+    currentAOIs.x2[currentAOIs.resizable] = ((currentAOIs.x2[currentAOIs.resizable] - aoiShiftX)/ aoiScaleX ).astype(int)
+    currentAOIs.y2[currentAOIs.resizable] = ((currentAOIs.y2[currentAOIs.resizable] - aoiShiftY)/ aoiScaleY ).astype(int)
 
     # debug: output AOIs
     for a in currentAOIs:
@@ -390,6 +425,16 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     # sort by time so that the output is in order 
     frameEvents.sort(order="t")
     logging.debug("logEvents: len(events) = {}, len(currentAOIs) = {}, lastvTime ={}, vTime={}".format(len(frameEvents), len(currentAOIs), lastVTime, vTime))
+
+    # get the current item name
+    currItem = "NONAOI"
+    for a in currentAOIs:
+        #logging.debug("logEvents: aoi page = {}".format(a["page"]))
+        # if the page title starts with Assessment/items, then this is the page, and we exit this loop
+        if a["page"].startswith("Assessment/items"):
+            currItem = a["page"]
+            logging.debug("logEvents: currItem = {}".format(currItem))
+            break
 
     for e in frameEvents:
         etime = int(e["t"])
@@ -405,60 +450,38 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         # One benefit is that we can produce heatmaps easily on the content. 
 
         try:        
-            x=int((e["x"]-aoiShiftX)/ aoiScaleX)
-            y=int((e["y"]-aoiShiftY)/ aoiScaleY)
+            ox=int((e["x"]-aoiShiftX)/ aoiScaleX)
+            oy=int((e["y"]-aoiShiftY)/ aoiScaleY)
         except:
             # not available
-            x=-32768; y=-32768
+            ox=-32768; oy=-32768
 
         #standardized x y usng global aoishift and aoiscale vars
-        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tinfo={}".format(e["event"], int(videoTime), etime, x, y, e["info"])
+        estring = "{}:\tvt={}\tgzt={}\tx={}\ty={}\tox={}\toy={}\tinfo={}".format(
+            e["event"], int(videoTime), etime, e['x'], e['y'], ox, oy, e["info"])
 
 
         # you shouldn't have a case where aoistring is undefined without the follow ling but it had occurred. 
-        currItem = "NONAOI"
-        aoistring = currItem+"\t\t\t\t\t\t"
-        for a in currentAOIs:
-            #logging.debug("logEvents: aoi page = {}".format(a["page"]))
-            # if the page title starts with Assessment/items, then this is the page, and we exit this loop
-            if a["page"].startswith("Assessment/items"):
-                currItem = a["page"]
-                logging.debug("logEvents: currItem = {}".format(currItem))
-                break
-
+        aoistring = currItem+"\t\t\t\t\t\t\t\t"
         # Now start to assign AOI, for each matching AOI; if there are no matching AOIs, we print the page title        
         if len(currentAOIs)==0:
-            aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t"
-            activeAOI=[]  
-        elif x>0 and y>0:
+            aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t\t\t"
+            #activeAOI=[]  
+        elif ox>0 and oy>0:
             # this skips keystrokes and missing data, junk screen etc.
-            aoistring = str(currItem)+"\t\t\t\t\t\t"
+            aoistring = str(currItem)+"\t\t\t\t\t\t\t\t"
             for aoi in currentAOIs:
-                # print aoi
-                if aoi["x1"] <=x and aoi["x2"] >x and aoi["y1"] <=y and aoi["y2"] >y and not aoi["id"].startswith("__MATCH__"):
-                    # this is when 
-                    aoistring="\t".join([str(s) for s in aoi])
+                # if the aoi is resizable, use the x, y; if not, use the original 
+                x = ox if aoi['resizable'] else e['x']
+                y = oy if aoi['resizable'] else e['y']
 
-            # # now do aoi matching
-            # activeAOI=currentAOIs[np.where(currentAOIs.x1<=x )]
-            # activeAOI=activeAOI[np.where(activeAOI.x2>x)]
-            # activeAOI=activeAOI[np.where(activeAOI.y1<=y)]
-            # activeAOI=activeAOI[np.where(activeAOI.y2>y)]
-            # if len(activeAOI)>0:
-            #     for aoi in activeAOI:
-            #         #if not "__MATCH__" in aoi["id"]:
-            #         if not aoi["id"].startswith("__MATCH__"):
-            #             # skip templates for template matching or tracking
-            #             aoistring="\t".join([str(s) for s in aoi])
-            # else:
-            #     # gaze is not on an AOI; print out the name of the page; 
-            #     # keep in mind that aoilist[0] is the match template, which is not useful; 
-            #     # [-1] is often some other junk model thrown at the Assessment level, which we often don't want
-            #     # this should have a persistent "item" code even if the gaze is not on the item 
-            #     aoistring = str(currItem)+"\t\t\t\t\t\t"
+                if aoi["x1"] <=x and aoi["x2"] >x and aoi["y1"] <=y and aoi["y2"] >y and not aoi["id"].startswith("__MATCH__"):
+                    # AOI string = all the AOI fields (resized or not) + x, y of the gaze from the topleft of the AOI
+                    aoistring="\t".join([str(s) for s in aoi]) +"\t"+ str(x-aoi["x1"]) + "\t"+ str(y-aoi["y1"])
+
         else:
             # for keystrokes or bad gaze data, etc. at least print the page
-            aoistring = str(currItem)+"\t\t\t\t\t\t"
+            aoistring = str(currItem)+"\t\t\t\t\t\t\t\t"
 
         # now let's log
         logging.info(estring +"\taoi=" +aoistring)
@@ -484,20 +507,14 @@ def displayFrame(windowName, aoiLastVTime=100):
 
     '''
     global frame, txt, yamlconfig, vTime
-    global gazex, gazey, mousex, mousey, activeAOI
+    global gazex, gazey, mousex, mousey #, activeAOI
 
     text_color = (128,128,128)
     txt+= ", gaze=({}, {}), mouse=({}, {})".format(gazex, gazey, mousex, mousey)
     cv2.putText(frame, txt, (20,100), cv2.FONT_HERSHEY_PLAIN, 1.0, text_color, thickness=1)
 
     # # get the AOIs on the current page
-    # tlist = [a[1] for a in aoilist if a[1] <= vTime]
-    # lastVTime = max(tlist) if len(tlist)>0 else vTime
-    # currentAOIs = [a for a in aoilist if a[1]== lastVTime]
-    # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
-    # currentAOIs = currentAOIs.view(np.recarray)
-
-    # get AOIs in the past 100ms
+     # get AOIs in the past 100ms
     currentAOIs = getCurrentAOIs(aoilist, vTime)
 
     # display rect for aoilist elements
@@ -516,14 +533,6 @@ def displayFrame(windowName, aoiLastVTime=100):
                 # this is when 
                 cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
     
-    # # displays the AOI of the last matched object
-    # if len(currentAOIs)>0 and len(activeAOI)>0: 
-    #     for d in activeAOI:
-    #         #if not ("__MATCH__" in d["id"]):
-    #         if not d["id"].startswith("__MATCH__"):
-    #             # actual active AOIs
-    #             cv2.rectangle(frame, (d["x1"], d["y1"]), (d["x2"], d["y2"]), (0,0,255), 2)
-                
     # shows the gaze circle
     if not np.isnan(gazex+gazey): 
         cv2.circle(frame, (int(gazex), int(gazey)), 10, (0,0,255), -1)
@@ -542,14 +551,6 @@ def displayFrame(windowName, aoiLastVTime=100):
     elif (key==32):
         logging.info("GUI: paused"+txt)
         cv2.waitKey()
-    # elif (key==43):
-        # frameNum+=500
-        # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
-        # forcedCalc=True
-    # elif (key==45):
-        # frameNum-=500
-        # video.set(cv.CV_CAP_PROP_POS_FRAMES, frameNum)
-        # forcedCalc=True
     elif (key>0):
         # any other key saves a screenshot of the current frame
         logging.info("GUI: key="+str(key)+"\tvideoFrame written to="+windowName+"_"+str(vTime)+".png"+txt)
@@ -642,6 +643,10 @@ def p2ReadSignatureImage(k, value, c):
     else:
         # full color
         pass
+    # resizable?
+    resizable = False;  # default
+    if "resizable" in value:
+        resizable = value["resizable"]
 
     # now store the img into a dict, indexed by 
     # @@@ fname for now; it should be by the ITEM/AOI name, which shoud be unique, 
@@ -665,7 +670,8 @@ def p2ReadSignatureImage(k, value, c):
         'lastKnownPositionX': None,
         'lastKnownPositionY': None,
         'lastKnownBestFit': None,
-        'currentFit': None
+        'currentFit': None,
+        'resizable': resizable
         }
 
     #signatureImageDict[fname]=img
@@ -679,6 +685,10 @@ def resizeSignatureImages(aoiScaleX, aoiScaleY, signatureImageDict):
     for k in signatureImageDict:
         #signatureImageDict[k] = cv2.resize(signatureImageDict[k], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
         sig = signatureImageDict[k]
+        if not sig['resizable']:
+            logging.debug("resizeSignatureImages: sig={}, is not resizable".format(k))
+            continue
+
         logging.debug("resizeSignatureImages: sig={}, size={}".format(k, np.shape(sig['img'])))
 
         sig['img'] = cv2.resize(sig['img'], (0,0), fx= aoiScaleX, fy=aoiScaleY) 
@@ -716,6 +726,11 @@ def p2Task(k, value, context):
     # matching block; returns if no match, so that the recording blocks don't execute
     #########################
     # check if there is a field "match"
+        # resizable?
+    resizable = False;  # default
+    if "resizable" in value:
+        resizable = value["resizable"]
+
     if "match" in value:
         # first make sure v is in the signature image list
         # @@ this doesn't work -- it plots all the AOIs at odd places
@@ -838,8 +853,8 @@ def p2Task(k, value, context):
                 logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
 
                 # ITDS hack: assuming nodes with this keyword are special. 
-                # if no match, we will put a JUNKSCREEN AOI
-                updateAOI((basename, vTime, str(fname), "NOMATCH", "NOMATCH", 0, 0, frame.shape[1], frame.shape[0]))
+                # if no match, we will put a JUNKSCREEN AOI; AOI not resizable
+                updateAOI((basename, vTime, str(fname), "NOMATCH", "NOMATCH", 0, 0, frame.shape[1], frame.shape[0]), resizable=False)
 
             return None
         # only proceed if Match succeeded
@@ -871,7 +886,7 @@ def p2Task(k, value, context):
         coord[3]= h+ objoffset[1]
 
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-        updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
 
     if "textMatch" in value:
         # as in         textMatch: 477, 120, 224, 42, "Proportional Punch"
@@ -945,8 +960,8 @@ def p2Task(k, value, context):
                 coord[2]=coord[2]+coord[0]
                 coord[3]=coord[3]+coord[1]
         pageTitle = "/".join(context)        # 'Assessment/items/Task3DearEditor'
-        logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        logging.info("OriginalAOI\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
 
     if "relativeAOI" in value:
         # something like: relativeAOI: 0, 0, 785, 573
@@ -973,7 +988,7 @@ def p2Task(k, value, context):
         # output
         pageTitle = "/".join(context)
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
-        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
+        updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]), resizable=resizable)
 
     if "ocr" in value: 
         coord = map(int, value["ocr"].split(","))   # in order x1, y1, x2, y2
@@ -1009,6 +1024,9 @@ def p2Task(k, value, context):
         if "outputAOI" in yamlconfig["study"] and yamlconfig["study"]["outputAOI"]:
             parser.ocrOffsetX = coord[0]; parser.ocrOffsetY = coord[1]; 
             parser.ocrPageTitle = "/".join(context+[k]) #'Assessment/items/Task3DearEditor/tab1'
+            # by default resizable=False in updateAOI(data, resizable)
+            #    which is good, because these are recognized from the current video frame
+            #    and there is no need to rescale
             parser.callbackfunc = updateAOI #callback func to construct AOI
             logging.info("")
             parser.feed(html)  
@@ -1069,7 +1087,7 @@ def processVideo(v):
     global yamlconfig, gaze, aoilist, toffset, logLevel, outputLogFileSuffix
     global video, frame,  startFrame #, minVal, taskSigLoc,
     global txt, basename, vTime, jumpAhead, skimmingMode
-    global gazex, gazey, mousex, mousey, activeAOI
+    global gazex, gazey, mousex, mousey #, activeAOI
     global aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY
     
     # local vars
@@ -1166,7 +1184,7 @@ def processVideo(v):
     logging.info("NumFrames = "+str(nFrames)+"\tStartFrame = "+str(startFrame)+ "\tFPS="+str(fps))
 
     # init
-    gazex=-999; gazey=-999; mousex=-99; mousey=-99; activeAOI=[]
+    gazex=-999; gazey=-999; mousex=-99; mousey=-99; #activeAOI=[]
 
     # set the flag for skimmingMode
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
