@@ -15,9 +15,9 @@ from FrameEngine import *    #FrameEngine
 
 import yaml
 
-from video2aoiUtils import *
+import video2aoiUtils as utils
 #from video2aoiUtils_signatureImages import *
-from findVideoGazeOffset import *
+import findVideoGazeOffset as utilsOffset
 
     
 ##################
@@ -176,8 +176,8 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640),
             flag, frame = video.retrieve()
             #print "vTime = {}".format(vTime)
             # match the mouse position, using a threshold
-            res1 = frameEngine.findMatch(frame, sig1['img'], 0.02)
-            res2 = frameEngine.findMatch(frame, sig2['img'], 0.02)
+            res1 = frameEngine.findMatch(frame, sig1['img'], 0.1)
+            res2 = frameEngine.findMatch(frame, sig2['img'], 0.1)
             
             # add to mouseVideoData if it's position has changed
             if res1 is not None and res2 is not None:
@@ -193,15 +193,18 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640),
                 x2 +=margins[2]; y2 += margins[3]
 
                 break
+            # display
+            #if not displayFrame(windowName): exit(-1)
         # 
-        print "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1))
-        logging.info( "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
+        #print "getVideoScalingFactors = {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1))
+        logging.debug( "getVideoScalingFactors: coordinates= {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
         shiftx = x1; shifty = y1
         scalex = 1 if x2==0 else (x2-x1)*1.0/TemplateSize[0]
         scaley = 1 if y2==0 else (y2-y1)*1.0/TemplateSize[1]
 
         # rewind the video
         video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
+
 
     return (shiftx, shifty, scalex, scaley)
 
@@ -368,7 +371,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     # currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), ('page', 'S80'), ('id', 'S40'), ('content','S80'), ('x1',int), ('y1',int), ('x2',int), ('y2',int)])
     # currentAOIs = currentAOIs.view(np.recarray)
 
-    currentAOIs = getCurrentAOIs(aoilist, vTime, lastVTime)
+    currentAOIs = getCurrentAOIs(aoilist, vTime)
     # scale the AOI back to the standardized, centering at the top-left corner
     currentAOIs.x1 = ((currentAOIs.x1 - aoiShiftX)/ aoiScaleX ).astype(int)
     currentAOIs.y1 = ((currentAOIs.y1 - aoiShiftY)/ aoiScaleY ).astype(int)
@@ -495,7 +498,7 @@ def displayFrame(windowName, aoiLastVTime=100):
     # currentAOIs = currentAOIs.view(np.recarray)
 
     # get AOIs in the past 100ms
-    currentAOIs = getCurrentAOIs(aoilist, vTime, vTime - 100)
+    currentAOIs = getCurrentAOIs(aoilist, vTime)
 
     # display rect for aoilist elements
     if "displayAOI" in yamlconfig["study"].keys() and yamlconfig["study"]["displayAOI"]==True:
@@ -582,7 +585,7 @@ def p2ReadSignatureImage(k, value, c):
         return True
 
     # set colorplane choices
-    colorPlane = getColorPlane(yamlconfig)
+    colorPlane = utils.getColorPlane(yamlconfig)
 
     fname = para[0]
     if not isinstance(fname, str): 
@@ -687,147 +690,6 @@ def resizeSignatureImages(aoiScaleX, aoiScaleY, signatureImageDict):
         # for debugging only
         cv2.imwrite(sig['fname']+"_resized.png", sig["img"])
 
-def doTemplateMatching (k, value, context):
-    '''Do the template matching, called from p2Task'''
-    global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
-
-    # first make sure v is in the signature image list
-    para=value["match"].split(",")
-    fname = para[0]
-    if not isinstance(fname, str): 
-        logging.error("MATCH: expecting a filename but got "+str(fname))
-        return True
-    # if image path name is specified, can be absolute or relative
-    if "imgFilePath" in yamlconfig["study"].keys():
-        fname = os.path.join(yamlconfig["study"]["imgFilePath"], fname)
-    if not (fname in signatureImageDict):
-        logging.error("SignatureMatch: context="+str(context)+" fname="+str(fname)+" is not in the SignatureImageDict"+txt)
-        return True
-
-    # assuming the signature is the fname image, unless sourceLoc is specified later
-    sig=signatureImageDict[fname]
-
-    # optional threshold parameter
-    threshold = -99        
-    if len(para)==2:
-        try:
-            threshold = float(value["match"].split(",")[1])
-        except:
-            logging.error("MATCH: expecting a float number but got "+str(value["match"].split(",")[1]))
-            return True
-    # extract the signature if sourceLoc is specified
-    # this means that (a) fname is the src and (b) match will be attempted at this perceise location
-    #img=np.copy(frame)
-    srccoord=[0,0,0,0]
-    if "sourceLoc" in value:
-        # something like: sourceLoc: 836, 294, 256, 140
-        srccoord = map(int, value["sourceLoc"].split(","))   # by default, in order x1, y1, x2, y2
-        if "aoiFormat" in yamlconfig["study"]:
-            if yamlconfig["study"]["aoiFormat"] == "xywh":
-                # the x,y,w,h format: convert to xyxy format
-                srccoord[2]=srccoord[2]+srccoord[0]
-                srccoord[3]=srccoord[3]+srccoord[1]
-        # now get the sig from the source image
-        #img= frame[srccoord[1]:srccoord[3], srccoord[0]:srccoord[2]]
-
-    # now get the range of search in the destination
-    # if not specified, we cut the img from sourceLoc (add 1 px in each deminsion so the alg works)
-    # otherwise we cut the img out of frame based on destRange.
-    if "sourceLoc" in value:
-        destcoord = srccoord
-    else:
-        # no sourceLoc specified, we use the whole frame; 
-        # note the shape() func returns [h,w,#color] as in numpy
-        destcoord = [0,0, frame.shape[1], frame.shape[0]]
-
-    if not "destRange" in value:
-        # let's do +/- 2 pix on each side
-        destcoord[0]=destcoord[0]-2
-        destcoord[1]=destcoord[1]-2
-        destcoord[2]=destcoord[2]+2
-        destcoord[3]=destcoord[3]+2
-    else:
-        # destRange is in the value
-        destcoord = map(int, value["destRange"].split(","))   # by default, in order x1, y1, x2, y2
-        if "aoiFormat" in yamlconfig["study"]:
-            if yamlconfig["study"]["aoiFormat"] == "xywh":
-                # the x,y,w,h format: convert to xyxy format
-                destcoord[2]=destcoord[2]+destcoord[0]
-                destcoord[3]=destcoord[3]+destcoord[1]
-
-    # make sure everything is within the frame
-    if destcoord[0]<0: destcoord[0]=0
-    if destcoord[1]<0: destcoord[1]=0
-    if destcoord[2]>frame.shape[1]: destcoord[2]=frame.shape[1]
-    if destcoord[3]>frame.shape[0]: destcoord[3]=frame.shape[0]
-
-    # we now have the dest range; now use this to cut the image
-    img= frame[destcoord[1]:destcoord[3], destcoord[0]:destcoord[2]]
-
-    res = None
-    # first look at the lastKnownPosition
-    # @ this algorithm doesn't work, because all but one will fail the first
-    # @ then we are simply adding another round of matching
-    if (sig['lastKnownPositionX'] is not None):
-        # if it's already set, let's get the image
-        sigshape = sig['img'].shape
-        x1=sig['lastKnownPositionX']-2
-        y1=sig['lastKnownPositionY']-2
-        x2=x1+ sigshape[1]+2
-        y2=y1+ sigshape[0]+2
-
-        lastImg = frame[y1:y2, x1:x2]
-
-        # now let's find the template
-        if threshold == -99:
-            # use the global default threshold
-            res = frameEngine.findMatch(lastImg, sig['img'])
-        else:
-            # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(lastImg, sig['img'], threshold)
-
-    # if lastKnownPosition was not set or it was not found in there
-    if res is None:
-        # now let's find the template
-        if threshold == -99:
-            # use the global default threshold
-            res = frameEngine.findMatch(img, sig['img'])
-        else:
-            # a new threshold is specified in the YAML file
-            res = frameEngine.findMatch(img, sig['img'], threshold)
-    else:
-        # if the target is found at the last known position, add the offset back
-        destcoord[0] = sig['lastKnownPositionX']-2
-        destcoord[1] = sig['lastKnownPositionY']-2
-
-    
-    if res is None:
-        # no match found; stop processing child nodes
-        logging.debug("MATCH: context="+str(context)+" fname="+str(fname)+" is not found in the current frame")
-        if "unmatchLog" in value:
-            # need to log this event
-            logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
-        return None
-    # only proceed if Match succeeded
-    taskSigLoc, minVal=res
-    objoffset = [taskSigLoc[0] + destcoord[0], taskSigLoc[1] + destcoord[1]]
-
-    # update the lastKnownPositions
-    sig['lastKnownPositionX'] = objoffset[0]
-    sig['lastKnownPositionY'] = objoffset[1]
-    sig['lastKnownBestFit']   = minVal
-
-    coord=[0,0,0,0]
-    h, w, clr= sig['img'].shape
-    coord[0]= objoffset[0]
-    coord[1]= objoffset[1]
-    coord[2]= w+ objoffset[0]
-    coord[3]= h+ objoffset[1]
-
-    logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
-    updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
-
-
 def p2Task(k, value, context):
     '''A callback function for p2YAML(). It taks a list of keys (context) and a Value from the
     yamlconfig, and takes appropriate actions; 
@@ -844,12 +706,15 @@ def p2Task(k, value, context):
     '''
 
     global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
-    
+    global aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY    
     #print "p2Task: k="+str(k) +" v="+str(v)
     # need to look into the v for a field called "match"
     if not isinstance(value, dict):
         # not a dict, no need to process
         return True
+    #########################
+    # matching block; returns if no match, so that the recording blocks don't execute
+    #########################
     # check if there is a field "match"
     if "match" in value:
         # first make sure v is in the signature image list
@@ -903,7 +768,9 @@ def p2Task(k, value, context):
         else:
             # no sourceLoc specified, we use the whole frame; 
             # note the shape() func returns [h,w,#color] as in numpy
-            destcoord = [0,0, frame.shape[1], frame.shape[0]]
+            #destcoord = [0,0, frame.shape[1], frame.shape[0]]
+            # now the ITDS hack:
+            destcoord = sig['destRange'] if sig['destRange'] is not None else [0,0, frame.shape[1], frame.shape[0]]
 
         if not "destRange" in value:
             # let's do +/- 2 pix on each side
@@ -933,11 +800,10 @@ def p2Task(k, value, context):
         # first look at the lastKnownPosition
         if (sig['lastKnownPositionX'] is not None):
             # if it's already set, let's get the image
-            sigshape = sig['img'].shape
-            x1=sig['lastKnownPositionX']-2
-            y1=sig['lastKnownPositionY']-2
-            x2=x1+ sigshape[1]+2
-            y2=y1+ sigshape[0]+2
+            x1= sig['lastKnownPositionX']-2
+            y1= sig['lastKnownPositionY']-2
+            x2= x1+ sig['w']+2
+            y2= y1+ sig['h']+2
 
             lastImg = frame[y1:y2, x1:x2]
 
@@ -970,6 +836,11 @@ def p2Task(k, value, context):
             if "unmatchLog" in value:
                 # need to log this event
                 logging.info("LOG\t"+txt+"\tcontext='"+str(context)+"'\tmsg='"+value["unmatchLog"]+"'")
+
+                # ITDS hack: assuming nodes with this keyword are special. 
+                # if no match, we will put a JUNKSCREEN AOI
+                updateAOI((basename, vTime, str(fname), "NOMATCH", "NOMATCH", 0, 0, frame.shape[1], frame.shape[0]))
+
             return None
         # only proceed if Match succeeded
         taskSigLoc, minVal=res
@@ -979,6 +850,18 @@ def p2Task(k, value, context):
         sig['lastKnownPositionX'] = taskSigLoc[0]
         sig['lastKnownPositionY'] = taskSigLoc[1]
         sig['lastKnownBestFit']   = minVal
+
+        #@@@ this is a hack @@@ for ITDS only
+        # set the destcoord of ALL other sigs to the location of this one, with the correct size
+        # this is done only once, essentially, when the first sig is found. 
+        if sig['id'].startswith('Assessment/items'):
+            logging.debug("MATCH: Found signature={} destRange is '{}'".format(sig['id'], sig['destRange']))
+            for f in signatureImageDict:
+                s=signatureImageDict[f]
+                if s['destRange'] is None and s['id'].startswith('Assessment/items'):
+                    # do this hack on if destcoord is not specified
+                    s['destRange'] = [sig['lastKnownPositionX'], sig['lastKnownPositionY'], sig['lastKnownPositionX']+s['w'], sig['lastKnownPositionY']+s['h']]
+                    logging.debug("MATCH: signature={} destRange is set to '{}'".format(s['id'], s['destRange']))
 
         coord=[0,0,0,0]
         h, w, clr= sig['img'].shape
@@ -990,6 +873,65 @@ def p2Task(k, value, context):
         logging.debug("MATCH:\t"+txt+"\tSignature="+str(fname)+"\tLocation="+str(objoffset)+" AOI="+str(coord)+"\tminVal="+str(minVal))
         updateAOI((basename, vTime, str(fname), "__MATCH__"+str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
 
+    if "textMatch" in value:
+        # as in         textMatch: 477, 120, 224, 42, "Proportional Punch"
+        # parse the coords, which are upper-left-corner-based coordinates
+        # then update the AOIs, 
+        parsed = value["textMatch"].split(",")   # in order x1, y1, x2, y2, "Proportional Punch"
+        coord = None
+        try:
+            # replacing all quaotation marks; may not be a good idea
+            textMathKey = parsed[4].replace('"', "").replace("'", "").strip()
+            coord = map(int,parsed[0:4])
+            if "aoiFormat" in yamlconfig["study"]:
+                if yamlconfig["study"]["aoiFormat"] == "xywh":
+                    # the x,y,w,h format: convert to xyxy format
+                    coord[2]=coord[2]+coord[0]
+                    coord[3]=coord[3]+coord[1]
+            # adjust to the top-left corner coordinate:
+            #coord[2] = int(coord[0]+aoiShiftX + (coord[2]-coord[0]) * aoiScaleX)
+            #coord[3] = int(coord[1]+aoiShiftY + (coord[3]-coord[1]) * aoiScaleY)
+            coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
+            coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
+            coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
+            coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
+
+        except:
+            print "Error textMatch: input '{}' should be like 477, 120, 224, 42, 'Proportional Punch'".format(value["textMatch"])
+            logging.error("Error textMatch: input '{}'' should be like 477, 120, 224, 42, 'Proportional Punch'".format(value["textMatch"]))
+            return None
+        # final check
+        if coord is None: return None
+        logging.debug("textmatch: processing= {}, coord = {}, answerKey = {}".format(k, coord, textMathKey))
+
+        # now we have the coordinates, get the image
+        try:
+            # in numpy, the order goes (y1:y2, x1:x2)
+            if len(frame.shape)==2:
+                ocrBitmap=np.copy(frame[coord[1]:coord[3], coord[0]:coord[2]])  # grayscale already
+            else:
+                ocrBitmap=cv2.cvtColor(np.copy(frame[coord[1]:coord[3], coord[0]:coord[2]]), cv.CV_RGB2GRAY)
+        except:
+            logging.error("Error getting ocrBitmap. Check YAML textMatch lines. Key="+str(k)+" value="+str(value)+txt)
+            return None
+        # doing ocr
+        try:
+            ocrtext=tess.image2txt(ocrBitmap).replace("\n", " ")
+        except:
+            logging.error("Error doing OCR. Key="+str(k)+" value="+str(value)+txt)
+            return None
+        # compare, stop if no match
+        # we could use a less stringent, edit-distance-based approach in the future
+        #if str(textMathKey) not in str(ocrtext):
+        #if str(textMathKey) not in str(ocrtext):
+        if str(ocrtext).find(str(textMathKey))<0 :
+            logging.debug("textMatch: answerKey='{}' is not found in text='{}'".format(textMathKey, ocrtext))
+            logging.debug("textMatch: ocrtext is of type {}, textMathKey is of type {}".format(type(ocrtext), type(textMathKey)))
+            return None
+
+    #########################
+    # Recording block; only if some match is found above
+    #########################
     # if successful match or NO match needed
     if "log" in value: 
         # simply log the message
@@ -1032,7 +974,7 @@ def p2Task(k, value, context):
         pageTitle = "/".join(context)
         logging.info("AOIDAT\t"+txt+"\t"+pageTitle+"\t"+str(k)+"\t"+'\t'.join(map(str, coord))+"\t"+str(k))
         updateAOI((basename, vTime, pageTitle, str(k), str(k), coord[0], coord[1], coord[2], coord[3]))
-    
+
     if "ocr" in value: 
         coord = map(int, value["ocr"].split(","))   # in order x1, y1, x2, y2
         if "aoiFormat" in yamlconfig["study"]:
@@ -1230,17 +1172,34 @@ def processVideo(v):
     skimmingMode=True; frameChanged=False; skimFrames = int(jumpAhead * fps)
     lastCounter=0; lastVTime=0;
     # set colorplane choices
-    colorPlane = getColorPlane(yamlconfig)
+    colorPlane = utils.getColorPlane(yamlconfig)
 
     ##########################################
     # now test to see if the AOIs need to be scaled
     ##########################################
     # get the AOI shift and scale parameters
-    tmp = getVideoScalingFactors(video, TemplateSize = (1024, 640),
-                            topLeftTemplateName ="TopLeftCorner.png", 
-                            bottomRightTemplateName = "ButtomRightCorner.png",
-                            margins=(18,16,15,19) )
-    logging.info ("getVideoScalingFactors = {}".format(tmp))
+    templateSize = (1024, 640)
+    if "TemplateSize" in yamlconfig["study"]:
+        templateSize = tuple (map(int, yamlconfig["study"]["TemplateSize"].split(",")))   # by default, in order x1, y1, x2, y2
+
+    topLeftTemplateName ="TopLeftCorner.png"
+    if "topLeftTemplateName" in yamlconfig["study"]: 
+        topLeftTemplateName = yamlconfig["study"]["topLeftTemplateName"]
+    
+    bottomRightTemplateName ="ButtomRightCorner.png"
+    if "bottomRightTemplateName" in yamlconfig["study"]: 
+        bottomRightTemplateName = yamlconfig["study"]["bottomRightTemplateName"]
+
+    margins = (18,16,15,19)
+    if "TemplateMargins" in yamlconfig["study"]:
+        margins = tuple (map(int, yamlconfig["study"]["TemplateMargins"].split(",")))   # by default, in order x1, y1, x2, y2
+
+    # now actually get the scaling factors
+    tmp = getVideoScalingFactors(video, TemplateSize = templateSize,
+                            topLeftTemplateName = topLeftTemplateName, 
+                            bottomRightTemplateName = bottomRightTemplateName,
+                            margins=margins )
+    logging.info ("getVideoScalingFactors returns {}".format(tmp))
     #print "getVideoScalingFactors = {}".format(tmp)
     (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
    
@@ -1274,7 +1233,7 @@ def processVideo(v):
                 mvdStartTime = np.max(mvd.t) + 1000
 
                 # find the offset
-                tmp= findGazeVideoOffset(mouseData, mvd, 4, 250)
+                tmp= utilsOffset.findGazeVideoOffset(mouseData, mvd, 4, 250)
                 print "findGazeVideoOffset returns {} based on {} observations".format(tmp, len(mouseVideoData))
                 logging.info( "findGazeVideoOffset:\t{}".format(tmp))
 
