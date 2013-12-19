@@ -80,7 +80,7 @@ def updateAOI (data):
     # aoilist = np.vstack([aoilist, [data]])
 
 def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, mouseTemplateName = "mousetracking.png"):
-    global txt, frame, vTime
+    global txt, frame #, vTime
     global signatureImageDict
 
     mouseVideoData=[]
@@ -137,10 +137,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
     # mouseVideoData can be shorter than nSamples if the video ends
     return mouseVideoData
 
-def getVideoScalingFactors (video, TemplateSize = (1024, 640),
-                            topLeftTemplateName ="TopLeftCorner.png", 
-                            bottomRightTemplateName = "ButtomRightCorner.png",
-                            margins=(18,17,13,16) ):
+def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateName ="TopLeftCorner.png",  bottomRightTemplateName = "ButtomRightCorner.png",  margins=(18,17,13,16) ):
     '''This called at the beginning of a video processing task to identify the shifting and scaling
     factors needed to convert things into a standard metrics. For example, if the AOIs are defined 
     on a 1920x1080 video with a fullscreen, centered IE browser window with no zooming, and the current
@@ -362,7 +359,6 @@ def getCurrentAOIs (aoilist, vTime, lastVTime=0):
 
     return currentAOIs
 
-
 def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
     '''To log gaze and mouse events and associated AOIs to the log file. It takes the event list, aoi list, and timestamps 
     defining the begining and the end of the window (typically since the last time the AOIlist has been changed). It returns
@@ -464,6 +460,7 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
         # Now start to assign AOI, for each matching AOI; if there are no matching AOIs, we print the page title        
         if len(currentAOIs)==0:
             aoistring = "JUNKSCREEN"+"\t\t\t\t\t\t\t\t"
+            logging.info(estring +"\taoi=" +aoistring)
             #activeAOI=[]  
         elif ox>0 and oy>0:
             # this skips keystrokes and missing data, junk screen etc.
@@ -476,13 +473,16 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
                 if aoi["x1"] <=x and aoi["x2"] >x and aoi["y1"] <=y and aoi["y2"] >y and not aoi["id"].startswith("__MATCH__"):
                     # AOI string = all the AOI fields (resized or not) + x, y of the gaze from the topleft of the AOI
                     aoistring="\t".join([str(s) for s in aoi]) +"\t"+ str(x-aoi["x1"]) + "\t"+ str(y-aoi["y1"])
+                    # log for every matching aoi
+                    logging.info(estring +"\taoi=" +aoistring)
 
         else:
             # for keystrokes or bad gaze data, etc. at least print the page
             aoistring = str(currItem)+"\t\t\t\t\t\t\t\t"
+            logging.info(estring +"\taoi=" +aoistring)
 
         # now let's log
-        logging.info(estring +"\taoi=" +aoistring)
+        #logging.info(estring +"\taoi=" +aoistring)
 
         # now track the last gaze and the last mouse events for this "frame"
         #@@ this is ugly -- using global vars
@@ -553,7 +553,7 @@ def displayFrame(windowName, aoiLastVTime=100):
         # any other key saves a screenshot of the current frame
         logging.info("GUI: key="+str(key)+"\tvideoFrame written to="+windowName+"_"+str(vTime)+".png"+txt)
         cv2.imwrite(windowName+"_"+str(vTime)+".png", frame)
-        print key
+        print "\nGUI: Keypressed = {}".format(key)
     else: pass
 
     return True
@@ -715,6 +715,8 @@ def p2Task(k, value, context):
 
     global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
     global aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY    
+    # @ a quick hack to 
+    global itemIDString
     #print "p2Task: k="+str(k) +" v="+str(v)
     # need to look into the v for a field called "match"
     if not isinstance(value, dict):
@@ -724,8 +726,9 @@ def p2Task(k, value, context):
     # matching block; returns if no match, so that the recording blocks don't execute
     #########################
     # check if there is a field "match"
-        # resizable?
+    #     # resizable?
     resizable = False;  # default
+    # @@ should use isAOIResizable() function. 
     if "resizable" in value:
         resizable = value["resizable"]
 
@@ -904,10 +907,12 @@ def p2Task(k, value, context):
             # adjust to the top-left corner coordinate:
             #coord[2] = int(coord[0]+aoiShiftX + (coord[2]-coord[0]) * aoiScaleX)
             #coord[3] = int(coord[1]+aoiShiftY + (coord[3]-coord[1]) * aoiScaleY)
-            coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
-            coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
-            coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
-            coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
+            #if resizable:
+            if True:
+                coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
+                coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
+                coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
+                coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
 
         except:
             print "Error textMatch: input '{}' should be like 477, 120, 224, 42, 'Proportional Punch'".format(value["textMatch"])
@@ -939,8 +944,27 @@ def p2Task(k, value, context):
         if str(textMathKey).replace(" ","") not in str(ocrtext).replace(" ",""):
         #if str(ocrtext).find(str(textMathKey))<0 :
             logging.debug("textMatch: answerKey='{}' is not found in text='{}'".format(textMathKey, ocrtext))
-            logging.debug("textMatch: ocrtext is of type {}, textMathKey is of type {}".format(type(ocrtext), type(textMathKey)))
+            #logging.debug("textMatch: ocrtext is of type {}, textMathKey is of type {}".format(type(ocrtext), type(textMathKey)))
             return None
+
+    if "compareItemIDString" in value:
+        # different from 'textMatch', which includes the location of the videoframe to do OCR
+        # here we assume itemIDString is alreay recognized, and we are simply comparing.
+        # in the case where the global itemIDString is always at the same location, this reduces the 
+        # nubmer of OCR to once per frame. Remember to do findItemIDString in a parent node,
+        # typically when you get the video frame. 
+        if itemIDString is None:
+            logging.debug('compareItemIDString: itemIDString is empty')
+            # stop processing further
+            return None
+        # now get the answer key
+        textMathKey = value['compareItemIDString'].replace('"', "").replace("'", "").strip()
+
+        if str(textMathKey).replace(" ","") not in str(itemIDString).replace(" ",""):
+        #if str(ocrtext).find(str(textMathKey))<0 :
+            logging.debug("compareItemIDString: answerKey='{}' is not found in itemIDString='{}'".format(textMathKey, itemIDString))
+            return None
+
 
     #########################
     # Recording block; only if some match is found above
@@ -1029,6 +1053,59 @@ def p2Task(k, value, context):
             logging.info("")
             parser.feed(html)  
             logging.info("")
+
+    if "findItemIDString" in value:
+        # as in         findItemIDString: 477, 120, 224, 42
+        # parse the coords, which are upper-left-corner-based coordinates
+        # then update the AOIs, 
+        itemIDString = None
+
+        parsed = value["findItemIDString"].split(",")   # in order x1, y1, x2, y2
+        coord = None
+        try:
+            coord = map(int,parsed[0:4])
+            if "aoiFormat" in yamlconfig["study"]:
+                if yamlconfig["study"]["aoiFormat"] == "xywh":
+                    # the x,y,w,h format: convert to xyxy format
+                    coord[2]=coord[2]+coord[0]
+                    coord[3]=coord[3]+coord[1]
+            # adjust to the top-left corner coordinate:
+            #coord[2] = int(coord[0]+aoiShiftX + (coord[2]-coord[0]) * aoiScaleX)
+            #coord[3] = int(coord[1]+aoiShiftY + (coord[3]-coord[1]) * aoiScaleY)
+            #if resizable:
+            if True:
+                coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
+                coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
+                coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
+                coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
+        except:
+            print "Error findItemIDString: input '{}' should be like 477, 120, 224, 42".format(value["findItemIDString"])
+            logging.error("Error findItemIDString: input '{}'' should be like 477, 120, 224, 42".format(value["findItemIDString"]))
+            return None
+        # final check
+        if coord is None: return None
+        logging.debug("findItemIDString: processing= {}, coord = {}".format(k, coord))
+
+        # now we have the coordinates, get the image
+        try:
+            # in numpy, the order goes (y1:y2, x1:x2)
+            if len(frame.shape)==2:
+                ocrBitmap=np.copy(frame[coord[1]:coord[3], coord[0]:coord[2]])  # grayscale already
+            else:
+                ocrBitmap=cv2.cvtColor(np.copy(frame[coord[1]:coord[3], coord[0]:coord[2]]), cv.CV_RGB2GRAY)
+        except:
+            logging.error("Error getting ocrBitmap. Check YAML findItemIDString lines. Key="+str(k)+" value="+str(value)+txt)
+            return None
+        # doing ocr
+        try:
+            ocrtext=tess.image2txt(ocrBitmap).replace("\n", " ")
+        except:
+            logging.error("Error doing OCR. Key="+str(k)+" value="+str(value)+txt)
+            return None
+        # now, set value
+        logging.info('findItemIDString:\t{}'.format(itemIDString))
+        itemIDString = ocrtext
+
             
     if "screenshot" in value:
         # save a screenshot
