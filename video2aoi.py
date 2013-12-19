@@ -113,7 +113,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
                 #print "mouse: cur = {}  last = {},{}".format(mouseLoc, lastx, lasty)
                 if len(mouseVideoData) ==0 or mouseLoc[0] != lastx or mouseLoc[1] !=lasty:
                     mouseVideoData.append((vTime, mouseLoc[0], mouseLoc[1]))
-                    print "Mouse Found @ {}, val={}".format(mouseLoc, minVal)
+                    # print "Mouse Found @ {}, val={}".format(mouseLoc, minVal)
                     #(basename, vTime, PageTitle, aoiID, aoiContent, x1, y1, x2, y2)
                     updateAOI(("Mouse", 0, "Mouse", "Mouse", "Mouse", mouseLoc[0], mouseLoc[1],  mouseLoc[0]+10, mouseLoc[1]+10))
                     lastx, lasty = mouseLoc
@@ -180,8 +180,8 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateNa
             flag, frame = video.retrieve()
             #print "vTime = {}".format(vTime)
             # match the mouse position, using a threshold
-            res1 = frameEngine.findMatch(frame, sig1['img'], 0.1)
-            res2 = frameEngine.findMatch(frame, sig2['img'], 0.1)
+            res1 = frameEngine.findMatch(frame, sig1['img'], 0.05)
+            res2 = frameEngine.findMatch(frame, sig2['img'], 0.05)
             
             # add to mouseVideoData if it's position has changed
             if res1 is not None and res2 is not None:
@@ -199,6 +199,9 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateNa
                 break
             # display
             #if not displayFrame(windowName): exit(-1)
+            # if no match, jump forward a bit
+            video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+60)
+
         # 
         logging.debug( "getVideoScalingFactors: coordinates= {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
         shiftx = x1; shifty = y1
@@ -1293,6 +1296,7 @@ def processVideo(v):
         margins = tuple (map(int, yamlconfig["study"]["TemplateMargins"].split(",")))   # by default, in order x1, y1, x2, y2
 
     # now actually get the scaling factors
+    print "getVideoScalingFactors now"
     tmp = getVideoScalingFactors(video, TemplateSize = templateSize,
                             topLeftTemplateName = topLeftTemplateName, 
                             bottomRightTemplateName = bottomRightTemplateName,
