@@ -55,8 +55,8 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
         sqdist_min = np.min(sqdist)
         # if there is no match
         if sqdist_min > locationThreshold: 
-            logging.info( "Info findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm))
-            #print "Info findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
+            logging.info( "findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm))
+            print "findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
             return None
         # else we find the argmins, convert to list
         matchedIndices.append( np.where(sqdist == sqdist_min))
@@ -65,27 +65,51 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
 
     # drop those locations with multiple matches, i.e., where the mouse has passed several times
     # so what's left is the unique matches
-    sumV=0; sumG=0; c=0; lastInd=0;
+    #sumV=0; sumG=0; 
+    c=0; 
+    lastInd=0;
+    tList = []
     for i in range(len(matchedIndices)):
         indList = matchedIndices[i][0].tolist()
-        # eliminate ones 
-        if len(indList) ==1 and lastInd<indList[0]:
-            # good out-of-order cases ... impossible when we are processing frames one by one
-            sumG += mouseLog.t[indList[0]]
-            sumV += videoMouseLocations.t[i]
+        # eliminate ones that are too far apart or going backwards. 
+        #if len(indList) ==1 and lastInd<indList[0] and indList[0]-lastInd<1000:
+        if len(indList)>0 and lastInd<indList[0] and indList[0]-lastInd<1000:
+            # # good out-of-order cases ... impossible when we are processing frames one by one
+            # sumG += mouseLog.t[indList[0]]
+            # sumV += videoMouseLocations.t[i]
             c +=1
+
+            tList.append(mouseLog.t[indList[0]]-videoMouseLocations.t[i])
+
+            logging.info('findVideoGazeOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
+                c, indList[0], mouseLog.t[indList[0]], videoMouseLocations.t[i],
+                mouseLog.t[indList[0]]-videoMouseLocations.t[i]))
+            print 'findVideoGazeOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
+                c, indList[0], mouseLog.t[indList[0]], videoMouseLocations.t[i],
+                mouseLog.t[indList[0]]-videoMouseLocations.t[i])
             lastInd = indList[0]
 
     # now estimate the offset by taking an average of all
-    if c>0: 
-        t = (sumG- sumV)/c
-    else:
-        t = None   
+    # if c>0: 
+    #     t = (sumG- sumV)/c
+    # else:
+    #     t = None   
+    # # using a different algorithm, throwing out some extreme values
+    tList.sort()
+    print tList
+    logging.debug("findVideoGazeOffset\t{}".format(tList))
+
+    t=None
+    if len(tList)>7:
+        tList=tList[2:-2]   # remove the max and min
+        logging.debug("findVideoGazeOffset\t using {}".format(tList[2:-2]))
+        t=sum(tList)/len(tList)
     # if time offset is off by more than 5 seconds, then something is definitely wrong. Keep searching
-    if abs(t)>5000: 
-        logging.debug('findVideoGazeOffset: estimated t={} >|5000|'.format(t))
-        print 'findVideoGazeOffset: estimated t={} >|5000|'.format(t)
+    if t is not None and abs(t)>15000: 
+        logging.info('findVideoGazeOffset: estimated t={} >|15000|'.format(t))
+        print 'findVideoGazeOffset: estimated t={} >|15000|'.format(t)
         #t=None
+    #logging.info("findVideoGazeOffset\t#samples={} sumG={} sumV={} offset={}".format(c, sumG, sumV, t))
 
     #print "t= {}".format(t)
     logging.info("findVideoGazeOffset\t{}".format(t))

@@ -80,7 +80,7 @@ def updateAOI (data):
     # aoilist = np.vstack([aoilist, [data]])
 
 def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, mouseTemplateName = "mousetracking.png"):
-    global txt, frame #, vTime
+    global txt, frame , vTime
     global signatureImageDict
 
     mouseVideoData=[]
@@ -1316,7 +1316,7 @@ def processVideo(v):
         txt=""; gazex=0; gazey=0; mousex=0; mousey=0
         mouseVideoData =[]    
         tmp = None
-        mvdStartTime = 0
+        mvdStartTime = 20000
 
         if len(mouseData)>3:
             while tmp is None:
