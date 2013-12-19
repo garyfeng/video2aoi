@@ -349,8 +349,12 @@ def getCurrentAOIs (aoilist, vTime, lastVTime=0):
 
     # get the AOIs on the current page
     tlist = [a[1] for a in aoilist if a[1] <= vTime and a[1]>=lastVTime]
+    # note that if we don't insert some junkAOI when nothing matches, it would have always returned the last matched AOI
     lastTime = max(tlist) if len(tlist)>0 else vTime
     currentAOIs = [a for a in aoilist if a[1]== lastTime]
+    # now get rid of junk AOIs we insert there when there is no match
+    # this was to prevent getCurrentAOIs from always taking the last matched AOIs
+    currentAOIs = [a for a in currentAOIs if "NOMATCH" not in a[3]]
     currentAOIs = np.array(currentAOIs, dtype=[('basename', 'S40'), ('t', int), 
         ('page', 'S80'), ('id', 'S80'), ('content','S80'), 
         ('x1',int), ('y1',int), ('x2',int), ('y2',int), 
@@ -715,7 +719,8 @@ def p2Task(k, value, context):
 
     global signatureImageDict, frame, txt, yamlconfig, skimmingMode, basename, vTime
     global aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY    
-    # @ a quick hack to 
+    # for speedingup multiple OCRs to identify the itemIDString at the same location. 
+    # this has to be shared because multiple p2Task() runs use the same value
     global itemIDString
     #print "p2Task: k="+str(k) +" v="+str(v)
     # need to look into the v for a field called "match"
