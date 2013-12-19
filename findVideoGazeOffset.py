@@ -20,24 +20,24 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     logging.getLogger('')
 
     if not isinstance(mouseLog, np.ndarray):
-        logging.error( "Error findVideoGazeOffset(): mouseLog is not a numpy array")
+        logging.error( "Error findGazeVideoOffset(): mouseLog is not a numpy array")
         return None
     if not isinstance(videoMouseLocations, np.ndarray):
-        logging.error( "Error findVideoGazeOffset(): videoMouseLocations is not a numpy array")
+        logging.error( "Error findGazeVideoOffset(): videoMouseLocations is not a numpy array")
         return None
     if np.shape(videoMouseLocations)[0]<2 :
-        logging.error( "Error findVideoGazeOffset(): need at least 2 samples for videoMouseLocations ")
+        logging.error( "Error findGazeVideoOffset(): need at least 2 samples for videoMouseLocations ")
         return None
     if np.shape(mouseLog)[0]<2 :
-        logging.error( "Error findVideoGazeOffset(): need at least 2 samples for mouseLog ")
+        logging.error( "Error findGazeVideoOffset(): need at least 2 samples for mouseLog ")
         return None
     std = np.std(np.vstack([videoMouseLocations.x, videoMouseLocations.y]).T, axis=0)
     if std[0]== 0 and std[1]==0 :
-        logging.error( "Error findVideoGazeOffset(): mouse samples in videoMouseLocations cannot be all at the same location ")
+        logging.error( "Error findGazeVideoOffset(): mouse samples in videoMouseLocations cannot be all at the same location ")
         return None
     std = np.std(np.vstack([mouseLog.x, mouseLog.y]).T, axis=0)
     if std[0]== 0 and std[1]==0 :
-        logging.error( "Error findVideoGazeOffset(): mouse samples in mouseLog cannot be all at the same location ")
+        logging.error( "Error findGazeVideoOffset(): mouse samples in mouseLog cannot be all at the same location ")
         return None
 
     # sort by time
@@ -55,12 +55,12 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
         sqdist_min = np.min(sqdist)
         # if there is no match
         if sqdist_min > locationThreshold: 
-            logging.info( "findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm))
-            print "findVideoGazeOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
+            logging.info( "findGazeVideoOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm))
+            print "findGazeVideoOffset(): sqdist {} > {} at videoMouseLocations #{}".format(sqdist_min, locationThreshold, vm)
             return None
         # else we find the argmins, convert to list
         matchedIndices.append( np.where(sqdist == sqdist_min))
-    logging.info( "matchedIndices = {}".format(matchedIndices))
+    logging.debug()( "matchedIndices = {}".format(matchedIndices))
     #print "matchedIndices = {}".format(matchedIndices)
 
     # drop those locations with multiple matches, i.e., where the mouse has passed several times
@@ -81,12 +81,12 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
 
             tList.append(mouseLog.t[indList[0]]-videoMouseLocations.t[i])
 
-            logging.info('findVideoGazeOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
+            logging.info('findGazeVideoOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
                 c, indList[0], mouseLog.t[indList[0]], videoMouseLocations.t[i],
                 mouseLog.t[indList[0]]-videoMouseLocations.t[i]))
-            print 'findVideoGazeOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
-                c, indList[0], mouseLog.t[indList[0]], videoMouseLocations.t[i],
-                mouseLog.t[indList[0]]-videoMouseLocations.t[i])
+            #print 'findGazeVideoOffset: #{} index={} | GazeTime={} VideoTime = {} dT={}'.format(
+            #    c, indList[0], mouseLog.t[indList[0]], videoMouseLocations.t[i],
+            #    mouseLog.t[indList[0]]-videoMouseLocations.t[i])
             lastInd = indList[0]
 
     # now estimate the offset by taking an average of all
@@ -97,22 +97,22 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     # # using a different algorithm, throwing out some extreme values
     tList.sort()
     print tList
-    logging.debug("findVideoGazeOffset\t{}".format(tList))
+    logging.debug("findGazeVideoOffset\t time differences = {}".format(tList))
 
     t=None
     if len(tList)>7:
         tList=tList[2:-2]   # remove the max and min
-        logging.debug("findVideoGazeOffset\t using {}".format(tList[2:-2]))
+        logging.debug("findGazeVideoOffset\t using {}".format(tList))
         t=sum(tList)/len(tList)
     # if time offset is off by more than 5 seconds, then something is definitely wrong. Keep searching
     if t is not None and abs(t)>15000: 
-        logging.info('findVideoGazeOffset: estimated t={} >|15000|'.format(t))
-        print 'findVideoGazeOffset: estimated t={} >|15000|'.format(t)
+        logging.info('findGazeVideoOffset: estimated t={} >|15000|'.format(t))
+        print 'findGazeVideoOffset: estimated t={} >|15000|'.format(t)
         #t=None
-    #logging.info("findVideoGazeOffset\t#samples={} sumG={} sumV={} offset={}".format(c, sumG, sumV, t))
+    #logging.info("findGazeVideoOffset\t#samples={} sumG={} sumV={} offset={}".format(c, sumG, sumV, t))
 
     #print "t= {}".format(t)
-    logging.info("findVideoGazeOffset\t{}".format(t))
+    logging.info("findGazeVideoOffset:\t{}".format(t))
     return t
 
 
@@ -152,17 +152,17 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     # print "tdiff_min={}".format(tdiff_min)
 
     # if tdiff_min > temporalThreshold: 
-    #     logging.info( "Info findVideoGazeOffset(): No appropriate time difference is found, tmin =  {} > {}".format(tdiff_min, temporalThreshold))
+    #     logging.info( "Info findGazeVideoOffset(): No appropriate time difference is found, tmin =  {} > {}".format(tdiff_min, temporalThreshold))
     #     return None 
     # # now find out which rows they are:
     # tMatched = np.where(tdiff == tdiff_min)
     # print "tMatched = {}".format(tMatched)
 
     # if len(tMatched[0])==0:
-    #     logging.info( "Info findVideoGazeOffset(): This shouldn't happen: no match is found, tdiff = {} tdiff_min {}".format(tdiff, tdiff_min))
+    #     logging.info( "Info findGazeVideoOffset(): This shouldn't happen: no match is found, tdiff = {} tdiff_min {}".format(tdiff, tdiff_min))
     #     return None 
     # if len(tMatched[0])>1:
-    #     logging.info( "Info findVideoGazeOffset(): More than one match is found, tmin = {} > {}".format(tdiff_min, temporalThreshold))
+    #     logging.info( "Info findGazeVideoOffset(): More than one match is found, tmin = {} > {}".format(tdiff_min, temporalThreshold))
     #     return None 
     # # get the estimated gaze-video toffset
     # # note that np.where returns the (y,x) coordinate of the minimals
@@ -172,7 +172,7 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
 
     # t = t1[tMatched[0]] - videoMouseLocations.t[1]
     # t=t[0]
-    # logging.info( "Info findVideoGazeOffset(): t1[tMatched[0]]={}, videoMouseLocations[1].t={}, tOffset = {}".format(t1[tMatched[0]], videoMouseLocations.t[1], t))
+    # logging.info( "Info findGazeVideoOffset(): t1[tMatched[0]]={}, videoMouseLocations[1].t={}, tOffset = {}".format(t1[tMatched[0]], videoMouseLocations.t[1], t))
     # return t
 
 
