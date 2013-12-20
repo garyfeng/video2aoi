@@ -60,7 +60,7 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
             return None
         # else we find the argmins, convert to list
         matchedIndices.append( np.where(sqdist == sqdist_min))
-    logging.debug()( "matchedIndices = {}".format(matchedIndices))
+    logging.debug( "matchedIndices = {}".format(matchedIndices))
     #print "matchedIndices = {}".format(matchedIndices)
 
     # drop those locations with multiple matches, i.e., where the mouse has passed several times

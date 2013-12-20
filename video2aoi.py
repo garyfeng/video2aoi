@@ -8,7 +8,7 @@ import glob
 import logging
 import subprocess
 import argparse
-
+import time
 
 from TessEngine import *    #TessEngine, TessHTMLParser, imgTessHTMLParser
 from FrameEngine import *    #FrameEngine
@@ -89,7 +89,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
     p2ReadSignatureImage('mouseTemplateName', {'match':mouseTemplateName}, ['mouseTemplateName'])
     # this is slightly complicated because there may be a path added to the filename
     sig=[signatureImageDict[fname] for fname in signatureImageDict if fname.find(mouseTemplateName) >0]
-    print "mouse signature len = {}".format(len(sig))
+    #print "mouse signature len = {}".format(len(sig))
 
     sig = sig[0] if len(sig)>0 else None
 
@@ -1252,7 +1252,7 @@ def processVideo(v):
         if(gaze is not None and len(gaze) < 1):
             print("Error reading gaze data! File="+basename)
             logging.error("Error reading gaze data! File="+basename)
-        print "Gaze read from "+basename +" with n="+str(len(gaze))
+        #print "Gaze read from "+basename +" with n="+str(len(gaze))
         # end reading eye event log
     
     # now let's skip the video to the first gaze time, but only if startFrame is not deberately set.
@@ -1279,6 +1279,8 @@ def processVideo(v):
     # now test to see if the AOIs need to be scaled
     ##########################################
     # get the AOI shift and scale parameters
+    print "getVideoScalingFactors now ..."
+
     templateSize = (1024, 640)
     if "TemplateSize" in yamlconfig["study"]:
         templateSize = tuple (map(int, yamlconfig["study"]["TemplateSize"].split(",")))   # by default, in order x1, y1, x2, y2
@@ -1296,7 +1298,6 @@ def processVideo(v):
         margins = tuple (map(int, yamlconfig["study"]["TemplateMargins"].split(",")))   # by default, in order x1, y1, x2, y2
 
     # now actually get the scaling factors
-    print "getVideoScalingFactors now"
     tmp = getVideoScalingFactors(video, TemplateSize = templateSize,
                             topLeftTemplateName = topLeftTemplateName, 
                             bottomRightTemplateName = bottomRightTemplateName,
@@ -1309,13 +1310,15 @@ def processVideo(v):
     initAOIList()
 
     ###########################################
-    # find the video-gaze time offset
+    # find the gaze-video time offset
     ###########################################
+    print "findGazeVideoOffset now ..."
+
     if mouseBasedTimeSync:
         mouseData = alldata[np.where(alldata.event=="mouse")]
         mouseData = mouseData.view(np.recarray)
 
-        print "mouseData data len = "+str(len(mouseData))
+        print "findGazeVideoOffset: mouseData data len = "+str(len(mouseData))
 
         txt=""; gazex=0; gazey=0; mousex=0; mousey=0
         mouseVideoData =[]    
@@ -1486,6 +1489,8 @@ def processVideo(v):
     #########
     logging.info("Ended:"+txt)
     logging.shutdown()    
+    # wait for a while to let the logger shut down
+    time.sleep(2)
 
 def main():
     ''' Main function that processes arguments and gets things started. '''
