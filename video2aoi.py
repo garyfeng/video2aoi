@@ -121,7 +121,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
                 # if no match, jump forward a bit
                 video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+5)
             # stop if len(mouseVideoData) > 2
-            if len(mouseVideoData) >nSamples: break
+            if len(mouseVideoData) >= nSamples: break
 
             txt="Find Mouse, vTime={}".format(vTime)
             if not displayFrame(windowName): exit(-1)
@@ -129,6 +129,9 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
             # else jump forward 1 sec
             #video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+60)
 
+        # end of video:
+        if len(mouseVideoData) < nSamples:
+            return None
         # rewind the video
         video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
     else:
@@ -137,7 +140,7 @@ def getMousePositionsFromVideo(video, windowName, nSamples = 10, startTime = 0, 
     # mouseVideoData can be shorter than nSamples if the video ends
     return mouseVideoData
 
-def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateName ="TopLeftCorner.png",  bottomRightTemplateName = "ButtomRightCorner.png",  margins=(18,17,13,16) ):
+def getVideoScalingFactors (video, windowName, TemplateSize = (1024, 640), topLeftTemplateName ="TopLeftCorner.png",  bottomRightTemplateName = "ButtomRightCorner.png",  margins=(18,17,13,16), threshold=0.05 ):
     '''This called at the beginning of a video processing task to identify the shifting and scaling
     factors needed to convert things into a standard metrics. For example, if the AOIs are defined 
     on a 1920x1080 video with a fullscreen, centered IE browser window with no zooming, and the current
@@ -156,10 +159,14 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateNa
                     inside the topleft image.
     :param topLeftTemplateName: image name
     :param bottomRightTemplateName: image name
+    :param threshold: the threshold for template matching, default to 0.05
     :returns: a tuple of (shiftx, shifty, scalex, scaley), the shift and scaling parameters for the 
                     region covered between the two corners. 
 
     '''
+    global txt, frame , vTime
+
+    initAOIList ()
 
     # putting the corner templates in the signatureImageDict
     p2ReadSignatureImage('topLeftTemplateName', {'match': topLeftTemplateName}, ['topLeftTemplateName'])
@@ -173,34 +180,45 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateNa
     # proceed if we got both corners
     if sig1 is not None and sig2 is not None:
         # jump to about 50% into the video
-        video.set(cv.CV_CAP_PROP_POS_FRAMES, int(video.get( cv.CV_CAP_PROP_FRAME_COUNT )/2))
+        video.set(cv.CV_CAP_PROP_POS_FRAMES, int(video.get( cv.CV_CAP_PROP_FRAME_COUNT )/3))
         x1, y1, x2, y2 = (0,0,0,0)
 
         while video.grab():
             flag, frame = video.retrieve()
+            vTime = video.get(cv.CV_CAP_PROP_POS_MSEC)
             #print "vTime = {}".format(vTime)
             # match the mouse position, using a threshold
-            res1 = frameEngine.findMatch(frame, sig1['img'], 0.05)
-            res2 = frameEngine.findMatch(frame, sig2['img'], 0.05)
+            res1 = frameEngine.findMatch(frame, sig1['img'], threshold)
+            res2 = frameEngine.findMatch(frame, sig2['img'], threshold)
             
             # add to mouseVideoData if it's position has changed
-            if res1 is not None and res2 is not None:
+            if res1 is not None:
                 # only proceed if Match succeeded
                 # topleft
                 mouseLoc, minVal=res1
                 x1, y1 = mouseLoc
                 x1 +=margins[0]; y1 += margins[1]
+                updateAOI(("TopLeftCorner", 0, "TopLeftCorner", "TopLeftCorner", "TopLeftCorner", x1, y1,  x1+sig1['img'].shape[1], y1+sig1['img'].shape[0]))
 
+            if res2 is not None:
                 # bottomright
                 mouseLoc, minVal=res2
                 x2, y2 = mouseLoc
                 x2 +=margins[2]; y2 += margins[3]
+                updateAOI(("bottomright", 0, "bottomright", "bottomright", "bottomright", x2, y2,  x2+sig2['img'].shape[1], y2+sig2['img'].shape[0]))
 
-                break
             # display
-            #if not displayFrame(windowName): exit(-1)
+            txt = "video time ={} res1={} res2={}".format(vTime, res1, res2)
+            if not displayFrame(windowName): exit(-1)
             # if no match, jump forward a bit
             video.set(cv.CV_CAP_PROP_POS_FRAMES, video.get(cv.CV_CAP_PROP_POS_FRAMES)+60)
+
+            if res1 is not None and res2 is not None:
+                break
+
+        # if no match to the end of the video
+        if res1 is None or res2 is None:
+            return None
 
         # 
         logging.debug( "getVideoScalingFactors: coordinates= {}, w h ={}".format((x1, y1, x2, y2), (x2-x1, y2-y1)))
@@ -209,6 +227,7 @@ def getVideoScalingFactors (video, TemplateSize = (1024, 640), topLeftTemplateNa
         scaley = 1 if y2==0 else (y2-y1)*1.0/TemplateSize[1]
 
         print "getVideoScalingFactors = {}".format((shiftx, shifty, scalex, scaley))
+        time.sleep(2)
 
         # rewind the video
         video.set(cv.CV_CAP_PROP_POS_FRAMES, 0)
@@ -916,11 +935,22 @@ def p2Task(k, value, context):
             #coord[2] = int(coord[0]+aoiShiftX + (coord[2]-coord[0]) * aoiScaleX)
             #coord[3] = int(coord[1]+aoiShiftY + (coord[3]-coord[1]) * aoiScaleY)
             #if resizable:
+            objoffset = findLastMatchOffset(context+[k])
+            #@@ this is another hack: assuming the scale doesn't change
             if True:
+                #@@@@@@@@ hack!!
+                aoiShiftX = objoffset[0]
+                aoiShiftY = objoffset[1]
+
                 coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
                 coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
                 coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
                 coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
+            # now make it relative to the last matched
+            # coord[0]=int(coord[0] * aoiScaleX)+ objoffset[0]
+            # coord[1]=int(coord[1] * aoiScaleX)+ objoffset[1]
+            # coord[2]=int(coord[2] * aoiScaleX)+ objoffset[0]
+            # coord[3]=int(coord[3] * aoiScaleX)+ objoffset[1]
 
         except:
             print "Error textMatch: input '{}' should be like 477, 120, 224, 42, 'Proportional Punch'".format(value["textMatch"])
@@ -1081,11 +1111,19 @@ def p2Task(k, value, context):
             #coord[2] = int(coord[0]+aoiShiftX + (coord[2]-coord[0]) * aoiScaleX)
             #coord[3] = int(coord[1]+aoiShiftY + (coord[3]-coord[1]) * aoiScaleY)
             #if resizable:
+            objoffset = findLastMatchOffset(context+[k])
+            #@@ this is another hack: assuming the scale doesn't change
             if True:
+                #@@@@@@@@ hack!!
+                aoiShiftX = objoffset[0]
+                aoiShiftY = objoffset[1]
+
                 coord[0] = aoiShiftX + int(coord[0] * aoiScaleX)
                 coord[1] = aoiShiftY + int(coord[1] * aoiScaleY)
                 coord[2] = aoiShiftX + int(coord[2] * aoiScaleX)
                 coord[3] = aoiShiftY + int(coord[3] * aoiScaleY)
+
+
         except:
             print "Error findItemIDString: input '{}' should be like 477, 120, 224, 42".format(value["findItemIDString"])
             logging.error("Error findItemIDString: input '{}'' should be like 477, 120, 224, 42".format(value["findItemIDString"]))
@@ -1298,10 +1336,10 @@ def processVideo(v):
         margins = tuple (map(int, yamlconfig["study"]["TemplateMargins"].split(",")))   # by default, in order x1, y1, x2, y2
 
     # now actually get the scaling factors
-    tmp = getVideoScalingFactors(video, TemplateSize = templateSize,
+    tmp = getVideoScalingFactors(video, windowName, TemplateSize = templateSize,
                             topLeftTemplateName = topLeftTemplateName, 
                             bottomRightTemplateName = bottomRightTemplateName,
-                            margins=margins )
+                            margins=margins, threshold=0.06 )
     logging.info ("getVideoScalingFactors returns {}".format(tmp))
     #print "getVideoScalingFactors = {}".format(tmp)
     (aoiShiftX, aoiShiftY, aoiScaleX, aoiScaleY) = (0,0,1,1) if tmp is None else tmp
@@ -1329,13 +1367,17 @@ def processVideo(v):
             while tmp is None:
                 # there is mouse data in the eventdata.
                 d = getMousePositionsFromVideo(video, windowName, nSamples=10, startTime=mvdStartTime)
-                [mouseVideoData.append(i) for i in d]
+                if d is not None:
+                    [mouseVideoData.append(i) for i in d]
+                else:
+                    # something is wrong; use default offset
+                    break
 
                 # now we turn mosueVideoData into a numpy record array
                 mvd = np.array(mouseVideoData, dtype=[('t',int), ('x', int), ('y', int)])
                 mvd = mvd.view(np.recarray)
-                # next round starts 1sec after the last mouse sighting
-                mvdStartTime = np.max(mvd.t) + 1000
+                # next round starts 1sec after the last mouse sighting, or if no data, jump 
+                mvdStartTime = np.max(mvd.t) + 1000 if len(mvd)>0 else mvdStartTime+10000
 
                 # find the offset
                 tmp= utilsOffset.findGazeVideoOffset(mouseData, mvd, 4, 250)
@@ -1488,7 +1530,14 @@ def processVideo(v):
     # no more frames
     #########
     logging.info("Ended:"+txt)
-    logging.shutdown()    
+
+    log = logging.getLogger('')
+    x = list(log.handlers)
+    for i in x:
+        log.removeHandler(i)
+        i.flush()
+        i.close()    
+    # logging.shutdown()    
     # wait for a while to let the logger shut down
     time.sleep(2)
 
@@ -1599,7 +1648,7 @@ def main():
     if args.outputLogFileSuffix is not 'ignore':
         outputLogFileSuffix = args.outputLogFileSuffix
 
-    print("outputLogFileSuffix = {}".format(outputLogFileSuffix))
+    #print("outputLogFileSuffix = {}".format(outputLogFileSuffix))
 
     # log level is INFO unless otherwise specified
     logLevel= logging.DEBUG if "logLevelDebug" in yamlconfig["study"] and yamlconfig["study"]["logLevelDebug"] else logging.INFO
@@ -1614,7 +1663,7 @@ def main():
     mouseBasedTimeSync = True if (args.mouseBasedTimeSync is "T") else False
 
     #print "Loglevel: INFO={} DEBUG={}; current setting is {}={}".format(logging.INFO, logging.DEBUG, args.logLevel, logLevel)
-    print "INFO: startFrame: {}; jumpAhead={}; toffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
+    print "INFO: \nstartFrame: {}; jumpAhead={}; toffset={}; logLevel={} ".format(startFrame, jumpAhead, toffset, logLevel)
     # exit(0)
 
 
