@@ -14,6 +14,7 @@ from TessEngine import *    #TessEngine, TessHTMLParser, imgTessHTMLParser
 from FrameEngine import *    #FrameEngine
 
 import yaml
+import OrderedDictYAMLLoader
 
 import video2aoiUtils as utils
 #from video2aoiUtils_signatureImages import *
@@ -1350,9 +1351,9 @@ def processVideo(v):
     ###########################################
     # find the gaze-video time offset
     ###########################################
-    print "findGazeVideoOffset now ..."
 
     if mouseBasedTimeSync:
+        print "findGazeVideoOffset now ..."
         mouseData = alldata[np.where(alldata.event=="mouse")]
         mouseData = mouseData.view(np.recarray)
 
@@ -1594,7 +1595,7 @@ def main():
 
     yamlfile = args.YAMLFile
     try:
-        yamlconfig = yaml.load(open(yamlfile))
+        yamlconfig = yaml.load(open(yamlfile), OrderedDictYAMLLoader.OrderedDictYAMLLoader)
     except:
         print "Error with the YAML file: {} cannot be opened.".format(yamlfile)
         exit(-1)
@@ -1673,8 +1674,13 @@ def main():
     # Iterate through given files
     #################################
     for vf in args.avifiles:
+        if len(glob.glob(vf))==0:
+            print "Error: cannot find video file(s) '{}' ... skipping.".format(vf)
         for f in glob.glob(vf):
-            processVideo(f)
+            if os.path.isfile(f):
+                processVideo(f)
+            else:
+                print "Error: cannot find video file '{}' ... skipping this file.".format(f)
 
     #################################
     # done
