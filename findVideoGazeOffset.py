@@ -73,6 +73,7 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
         indList = matchedIndices[i][0].tolist()
         # eliminate ones that are too far apart or going backwards. 
         #if len(indList) ==1 and lastInd<indList[0] and indList[0]-lastInd<1000:
+        # the 3rd condition makes sure random matches won't affect subsequent matches
         if len(indList)>0 and lastInd<indList[0] and indList[0]-lastInd<1000:
             # # good out-of-order cases ... impossible when we are processing frames one by one
             # sumG += mouseLog.t[indList[0]]
@@ -99,11 +100,13 @@ def findGazeVideoOffset(mouseLog, videoMouseLocations, locationThreshold = 2, te
     print tList
     logging.debug("findGazeVideoOffset\t time differences = {}".format(tList))
 
-    t=None
-    if len(tList)>7:
-        tList=tList[2:-2]   # remove the max and min
-        logging.debug("findGazeVideoOffset\t using {}".format(tList))
-        t=sum(tList)/len(tList)
+    # simply use the median is probably better than 80% mean
+    t= np.median(np.array(tList)) if len(tList)>7 else None
+
+    # if len(tList)>7:
+    #     tList=tList[2:-2]   # remove the max and min
+    #     logging.debug("findGazeVideoOffset\t using {}".format(tList))
+    #     t=sum(tList)/len(tList)
     # if time offset is off by more than 5 seconds, then something is definitely wrong. Keep searching
     if t is not None and abs(t)>15000: 
         logging.info('findGazeVideoOffset: estimated t={} >|15000|'.format(t))
