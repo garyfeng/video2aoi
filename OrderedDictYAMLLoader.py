@@ -45,15 +45,20 @@ class OrderedDictYAMLLoader(yaml.Loader):
             mapping[key] = value
         return mapping
 
+
+
 if __name__ == '__main__':
     import textwrap
 
     sample = """
-    one:
-        two: fish
-        red: fish
-        blue: fish
-    two:
+    first:
+        two:
+            firsttwo: this one
+        blue: 
+            first_blue: this one is blue
+        red: 
+            firstred: that one
+    second:
         a: yes
         b: no
         c: null
@@ -63,3 +68,4 @@ if __name__ == '__main__':
 
     assert type(data) is OrderedDict
     print data
+
