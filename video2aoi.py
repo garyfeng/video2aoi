@@ -499,7 +499,8 @@ def logEvents (allevents, aoilist, lastVTime, vTime, tOffset=0):
 
                 if aoi["x1"] <=x and aoi["x2"] >x and aoi["y1"] <=y and aoi["y2"] >y and not aoi["id"].startswith("__MATCH__"):
                     # AOI string = all the AOI fields (resized or not) + x, y of the gaze from the topleft of the AOI
-                    aoistring="\t".join([str(s) for s in aoi]) +"\t"+ str(x-aoi["x1"]) + "\t"+ str(y-aoi["y1"])
+                    validAOIfields = aoi[2:]
+                    aoistring="\t".join([str(s) for s in validAOIfields]) +"\t"+ str(x-aoi["x1"]) + "\t"+ str(y-aoi["y1"])
                     # log for every matching aoi
                     logging.info(estring +"\taoi=" +aoistring)
 
